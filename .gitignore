@@ -2,3 +2,4 @@
 ros/build/
 ros/devel/
 *.pyc
+ros/.idea
