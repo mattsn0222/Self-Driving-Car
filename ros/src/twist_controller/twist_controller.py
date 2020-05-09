@@ -1,6 +1,7 @@
 import pid as PID
-import yaw_controller as YawController
-import lowpass as LowPassFilter
+from yaw_controller import YawController
+from lowpass import LowPassFilter
+from pid import PID
 import rospy
 
 GAS_DENSITY = 2.858
@@ -32,7 +33,7 @@ class Controller(object):
         
         self.last_time = rospy.get_time()
 
-    def control(self, *args, **kwargs):
+    def control(self, linear_vel, angular_vel, current_vel, dbw_enabled):
         # TODO: Change the arg, kwarg list to suit your needs
         # Return throttle, brake, steer
         if not dbw_enabled:
@@ -60,7 +61,7 @@ class Controller(object):
         
         if linear_vel == 0. and current_vel < 0.1:
             throttle = 0
-            brake = 700 # N*m - to hold the car in place if we are stopped at a light
+            brake = 400 # N*m - to hold the car in place if we are stopped at a light
             
         elif throttle < 0.1 and vel_error < 0:
             throttle = 0

@@ -3,3 +3,5 @@ ros/build/
 ros/devel/
 *.pyc
 ros/.idea
+data/dbw_test.rosbag.bag
+ros/src/twist_controller/*.csv
