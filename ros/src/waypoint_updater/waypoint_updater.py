@@ -105,6 +105,8 @@ class WaypointUpdater(object):
 
     def traffic_cb(self, msg):
         # TODO: Callback for /traffic_waypoint message. Implement
+        # you get the index of the waypoint that is closest to an upcoming red light, e.g. 12 for waypoints[12]
+        # Target velocity should be set to 0 at this point so the car can smoothly stop there
         pass
 
     def obstacle_cb(self, msg):

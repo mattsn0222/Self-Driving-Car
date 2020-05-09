@@ -51,6 +51,7 @@ class DBWTestNode(object):
         self.throttlefile = os.path.join(base_path, 'throttles.csv')
         self.brakefile = os.path.join(base_path, 'brakes.csv')
 
+        rospy.loginfo('Going into loop')
         self.loop()
 
     def loop(self):
@@ -59,49 +60,62 @@ class DBWTestNode(object):
             rate.sleep()
         fieldnames = ['actual', 'proposed']
 
+        rospy.loginfo('shutting down')
+
         with open(self.steerfile, 'w') as csvfile:
             writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
             writer.writeheader()
             writer.writerows(self.steer_data)
+
+        rospy.loginfo('steer done')
 
         with open(self.throttlefile, 'w') as csvfile:
             writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
             writer.writeheader()
             writer.writerows(self.throttle_data)
 
+        rospy.loginfo('throttle done')
         with open(self.brakefile, 'w') as csvfile:
             writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
             writer.writeheader()
             writer.writerows(self.brake_data)
+        rospy.loginfo('brake done ')
 
     def dbw_enabled_cb(self, msg):
         self.dbw_enabled = msg.data
 
     def steer_cb(self, msg):
         self.steer = msg.steering_wheel_angle_cmd
+        rospy.loginfo('steer cb')
 
     def throttle_cb(self, msg):
         self.throttle = msg.pedal_cmd
+        rospy.loginfo('throttle cb')
 
     def brake_cb(self, msg):
         self.brake = msg.pedal_cmd
+        rospy.loginfo('brake cb')
 
     def actual_steer_cb(self, msg):
         if self.dbw_enabled and self.steer is not None:
             self.steer_data.append({'actual': msg.steering_wheel_angle_cmd,
                                     'proposed': self.steer})
+            rospy.loginfo('steer added')
+
             self.steer = None
 
     def actual_throttle_cb(self, msg):
         if self.dbw_enabled and self.throttle is not None:
             self.throttle_data.append({'actual': msg.pedal_cmd,
                                        'proposed': self.throttle})
+            rospy.loginfo('throttle added')
             self.throttle = None
 
     def actual_brake_cb(self, msg):
         if self.dbw_enabled and self.brake is not None:
             self.brake_data.append({'actual': msg.pedal_cmd,
                                     'proposed': self.brake})
+            rospy.loginfo('brake added')
             self.brake = None
 
 
