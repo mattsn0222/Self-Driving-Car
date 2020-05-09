@@ -91,7 +91,7 @@ class DBWNode(object):
             #                                                     <dbw status>,
             #                                                     <any other argument you need>)
             if not None in (self.current_vel, self.linear_vel, self.angular_vel):
-                self.throttle, self.brake, self.steering = self.controller.control(self.linear_vel, self.angular_vel, self.current_velocity, self.dbw_enabled)
+                self.throttle, self.brake, self.steering = self.controller.control(self.linear_vel, self.angular_vel, self.current_vel, self.dbw_enabled)
             # if <dbw is enabled>:
             #   self.publish(throttle, brake, steer)
                 if self.dbw_enabled:
@@ -103,7 +103,7 @@ class DBWNode(object):
         self.dbw_enabled = msg
     
     def velocity_cb(self, msg):
-        self.current_velocity = msg.twist.linear.x
+        self.current_vel = msg.twist.linear.x
     
     def twist_cb(self, msg):
         self.linear_vel = msg.twist.linear.x
