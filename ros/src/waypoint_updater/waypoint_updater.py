@@ -3,6 +3,8 @@
 import rospy
 from geometry_msgs.msg import PoseStamped
 from styx_msgs.msg import Lane, Waypoint
+import numpy as np
+from scipy.spatial import KDTree
 
 import math
 
@@ -23,7 +25,8 @@ TODO (for Yousuf and Aaron): Stopline location for each traffic light.
 
 LOOKAHEAD_WPS = 200 # Number of waypoints we will publish. You can change this number
 MAX_JERK = 10 # m/s2
-MAZ_ACCEL = 10 # m/s2
+MAX_ACCEL = 10 # m/s2
+PUBLISH_RATE = 30 # the consumer (waypoint follower) is running at 30 Hz supposedly
 
 class WaypointUpdater(object):
     def __init__(self):
@@ -34,8 +37,9 @@ class WaypointUpdater(object):
 
         # TODO: Add a subscriber for /traffic_waypoint and /obstacle_waypoint below
         #rospy.Subscriber('/traffic_waypoint', Int32, self.traffic_cb)
+        #rospy.Subscriber('/obstacle_waypoint', Int32, self.obstacle_cb)
 
-        self.final_waypoints_pub = rospy.Publisher('/final_waypoints', Lane, queue_size=1)
+        self.final_waypoints_pub = rospy.Publisher('final_waypoints', Lane, queue_size=1)
 
         # TODO: Add other member variables you need below
         self.pose = None
@@ -46,7 +50,7 @@ class WaypointUpdater(object):
         self.loop()
     
     def loop(self):
-        rate = rospy.Rate(50)
+        rate = rospy.Rate(PUBLISH_RATE)
         while not rospy.is_shutdown():
             if self.pose and self.base_waypoints:
                 # Get closest waypoint
@@ -67,16 +71,21 @@ class WaypointUpdater(object):
         cl_vect = np.array(closest_coord)
         prev_vect = np.array(prev_coord)
         pos_vect = np.array([x, y])
-        
+
+        # take the dot product of the vector from the previous waypoint to the closest waypoint
+        # and the vector from the closes waypoint to the car. If it is positive (the two vectors
+        # point in the same direction), the car is past the current (closest) waypoint,
+        # otherwise it is behind the current waypoint (heading for the closest waypoint)
         val = np.dot(cl_vect-prev_vect, pos_vect-cl_vect)
         
-        if val > 0;
+        if val > 0:
             closest_idx = (closest_idx + 1) % len(self.waypoints_2d)
         return closest_idx
     
     def publish_waypoints(self, closest_idx):
         lane = Lane()
         lane.header = self.base_waypoints.header
+        #get the next section of waypoints ahead of the car (lookahead_wps items)
         lane.waypoints = self.base_waypoints.waypoints[closest_idx:closest_idx + LOOKAHEAD_WPS]
         self.final_waypoints_pub.publish(lane)
 
@@ -87,10 +96,11 @@ class WaypointUpdater(object):
 
     def waypoints_cb(self, waypoints):
         # TODO: Implement
-        #pass
+        #save the base waypoints. This callback is supposed to be called only once
         self.base_waypoints = waypoints
         if not self.waypoints_2d:
-            self.waypoints_2d = [[waypoint.pose.pose.position.x, waypoint.pose.pose.position.y] for waypoint in waypoints.waypoints.waypoints]
+            self.waypoints_2d = [[waypoint.pose.pose.position.x, waypoint.pose.pose.position.y] for waypoint in waypoints.waypoints]
+            # build a KD Tree to speed up searching for waypoints in the future
             self.waypoint_tree = KDTree(self.waypoints_2d)
 
     def traffic_cb(self, msg):
