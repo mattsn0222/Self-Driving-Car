@@ -56,20 +56,20 @@ class DBWNode(object):
         # TODO: Create `Controller` object
         # self.controller = Controller(<Arguments you wish to provide>)
         self.controller = Controller(vehicle_mass=vehicle_mass,
-                                     fuel_capacity=fuel_capacity
-                                     brake_deadband=brake_deadband
-                                     decel_limit=decel_limit
-                                     accel_limit=accel_limit
-                                     wheel_radius=wheel_radius
-                                     wheel_base=wheel_base
-                                     steer_ratio=steer_ratio
-                                     max_lat_accel=max_lat_accel
+                                     fuel_capacity=fuel_capacity,
+                                     brake_deadband=brake_deadband,
+                                     decel_limit=decel_limit,
+                                     accel_limit=accel_limit,
+                                     wheel_radius=wheel_radius,
+                                     wheel_base=wheel_base,
+                                     steer_ratio=steer_ratio,
+                                     max_lat_accel=max_lat_accel,
                                      max_steer_angle=max_steer_angle)
 
         # TODO: Subscribe to all the topics you need to
-        rospy.Subscribe('/vehicle/dbw_enabled', Bool, self.dbw_enabled_cb, queue_size=1)
-        rospy.Subscribe('/current_velocity', TwistStamped, self.velocity_cb, queue_size=1)
-        rospy.Subscribe('/twist_cmd', TwistStamped, self.twist_cb, queue_size=1)
+        rospy.Subscriber('/vehicle/dbw_enabled', Bool, self.dbw_enabled_cb)
+        rospy.Subscriber('/current_velocity', TwistStamped, self.velocity_cb)
+        rospy.Subscriber('/twist_cmd', TwistStamped, self.twist_cb)
         
         self.current_vel = None
         self.curr_ang_vel = None
