@@ -84,7 +84,7 @@ class WaypointUpdater(object):
             closest_idx = (closest_idx + 1) % len(self.waypoints_2d)
         return closest_idx
     
-    def publish_waypoints(self, closest_idx):
+    def publish_waypoints(self):
         final_lane = self.generate_trajectory()
         self.final_waypoints_pub.publish(final_lane)
     
@@ -97,8 +97,7 @@ class WaypointUpdater(object):
         base_waypoints = self.base_waypoints.waypoints[closest_idx:last_idx]
         
         # No changes to trajectory
-        #if (self.stopline_wp_idx == -1) or (self.stopline_wp_idx >= last_idx):
-        if (self.stopline_wp_idx >= last_idx):
+        if (self.stopline_wp_idx == -1) or (self.stopline_wp_idx >= last_idx):
             lane.waypoints = base_waypoints
         
         # Action needed
