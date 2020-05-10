@@ -7,7 +7,7 @@ cd ..
 sudo apt-get update
 sudo apt-get install -y ros-kinetic-dbw-mkz-msgs
 
-cd ros
+cd ~/Self-Driving-Car/ros/
 rosdep install --from-paths src --ignore-src --rosdistro=kinetic -y
 
 catkin_make
