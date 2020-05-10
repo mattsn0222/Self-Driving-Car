@@ -37,8 +37,8 @@ class WaypointUpdater(object):
         rospy.Subscriber('/base_waypoints', Lane, self.waypoints_cb)
 
         # TODO: Add a subscriber for /traffic_waypoint and /obstacle_waypoint below
-        #rospy.Subscriber('/traffic_waypoint', Int32, self.traffic_cb)
-        #rospy.Subscriber('/obstacle_waypoint', Int32, self.obstacle_cb)
+        rospy.Subscriber('/traffic_waypoint', Int32, self.traffic_cb)
+        rospy.Subscriber('/obstacle_waypoint', Int32, self.obstacle_cb)
 
         self.final_waypoints_pub = rospy.Publisher('final_waypoints', Lane, queue_size=1)
 
@@ -47,6 +47,7 @@ class WaypointUpdater(object):
         self.base_waypoints = None
         self.waypoints_2d = None
         self.waypoint_tree = None
+        self.stopline_wp_idx = -1
 
         self.loop()
     
@@ -55,11 +56,11 @@ class WaypointUpdater(object):
         while not rospy.is_shutdown():
             if self.pose and self.base_waypoints:
                 # Get closest waypoint
-                closest_waypoint_idx = self.get_closest_waypoint_id()
-                self.publish_waypoints(closest_waypoint_idx)
+                closest_waypoint_idx = self.get_closest_waypoint_idx()
+                self.publish_waypoints()
             rate.sleep()
     
-    def get_closest_waypoint_id(self):
+    def get_closest_waypoint_idx(self):
         x = self.pose.pose.position.x
         y = self.pose.pose.position.y
         closest_idx = self.waypoint_tree.query([x,y], 1)[1]
@@ -77,18 +78,57 @@ class WaypointUpdater(object):
         # and the vector from the closes waypoint to the car. If it is positive (the two vectors
         # point in the same direction), the car is past the current (closest) waypoint,
         # otherwise it is behind the current waypoint (heading for the closest waypoint)
-        val = np.dot(cl_vect-prev_vect, pos_vect-cl_vect)
+        val = np.dot(cl_vect-prev_vect, cl_vect-pos_vect)
         
-        if val > 0:
+        if val < 0:
             closest_idx = (closest_idx + 1) % len(self.waypoints_2d)
         return closest_idx
     
     def publish_waypoints(self, closest_idx):
+        final_lane = self.generate_trajectory()
+        self.final_waypoints_pub.publish(final_lane)
+    
+    def generate_trajectory(self)
         lane = Lane()
-        lane.header = self.base_waypoints.header
-        #get the next section of waypoints ahead of the car (lookahead_wps items)
-        lane.waypoints = self.base_waypoints.waypoints[closest_idx:closest_idx + LOOKAHEAD_WPS]
-        self.final_waypoints_pub.publish(lane)
+        #lane.header = self.base_waypoints.header
+        closest_idx = self.get_closest_waypoint_idx()
+        last_idx = closest_idx + LOOKAHEAD_WPS
+        # Get the next section of waypoints
+        base_waypoints = self.base_waypoints.waypoints[closest_idx:last_idx]
+        
+        # No changes to trajectory
+        if (self.stopline_wp_idx == -1) or (self.stopline_wp_idx >= last_idx):
+            lane.waypoints = base_waypoints
+        
+        # Action needed
+        else:
+            lane.waypoints = self.brake_action(base_waypoints, closest_idx)
+        
+        return lane
+        
+    def brake_action(self, waypoints, closest_idx):
+        # Array for brake waypoints to later be merged in
+        brake = []
+        # Enumerate over the list of waypoints
+        for i, wps in enumerate(waypoints):
+            # Add new Waypoint object
+            o = Waypoint()
+            o.pose = wps.pose
+            # Center of car
+            stop_idx = max(self.stopline_wp_idx - closest_idx - 2, 0)
+            # Calculate distance to start to decelerate
+            dist = self.distance(waypoints, i, stop_idx)
+            vel = math.sqrt(2*MAX_JERK*dist)
+            
+            # If the car is barely moving stop the car
+            if vel < 1.0:
+                vel = 0.0
+            
+            # To reduce large square roots when the distance is far
+            o.twist.twist.linear.x = min(vel, wps.twist.twist.linear.x)
+            brake.append(o)
+        
+        return brake
 
     def pose_cb(self, msg):
         # TODO: Implement
@@ -109,6 +149,7 @@ class WaypointUpdater(object):
         # you get the index of the waypoint that is closest to an upcoming red light, e.g. 12 for waypoints[12]
         # Target velocity should be set to 0 at this point so the car can smoothly stop there
         pass
+        #self.stopline_wp_idx = msg.data
 
     def obstacle_cb(self, msg):
         # TODO: Callback for /obstacle_waypoint message. We will implement it later
