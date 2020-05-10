@@ -37,8 +37,8 @@ class WaypointUpdater(object):
         rospy.Subscriber('/base_waypoints', Lane, self.waypoints_cb)
 
         # TODO: Add a subscriber for /traffic_waypoint and /obstacle_waypoint below
-        rospy.Subscriber('/traffic_waypoint', Int32, self.traffic_cb)
-        rospy.Subscriber('/obstacle_waypoint', Int32, self.obstacle_cb)
+        #rospy.Subscriber('/traffic_waypoint', Int32, self.traffic_cb)
+        #rospy.Subscriber('/obstacle_waypoint', Int32, self.obstacle_cb)
 
         self.final_waypoints_pub = rospy.Publisher('final_waypoints', Lane, queue_size=1)
 
@@ -97,12 +97,13 @@ class WaypointUpdater(object):
         base_waypoints = self.base_waypoints.waypoints[closest_idx:last_idx]
         
         # No changes to trajectory
-        if (self.stopline_wp_idx == -1) or (self.stopline_wp_idx >= last_idx):
+        #if (self.stopline_wp_idx == -1) or (self.stopline_wp_idx >= last_idx):
+        if (self.stopline_wp_idx >= last_idx):
             lane.waypoints = base_waypoints
         
         # Action needed
-        else:
-            lane.waypoints = self.brake_action(base_waypoints, closest_idx)
+        #else:
+        #    lane.waypoints = self.brake_action(base_waypoints, closest_idx)
         
         return lane
         
