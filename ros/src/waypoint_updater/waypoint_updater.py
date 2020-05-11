@@ -3,6 +3,7 @@
 import rospy
 from geometry_msgs.msg import PoseStamped
 from styx_msgs.msg import Lane, Waypoint
+from std_msgs.msg import Int32
 import numpy as np
 #from scipy.spatial import KDTree
 from scipy import spatial
@@ -37,7 +38,7 @@ class WaypointUpdater(object):
         rospy.Subscriber('/base_waypoints', Lane, self.waypoints_cb)
 
         # TODO: Add a subscriber for /traffic_waypoint and /obstacle_waypoint below
-        #rospy.Subscriber('/traffic_waypoint', Int32, self.traffic_cb)
+        rospy.Subscriber('/traffic_waypoint', Int32, self.traffic_cb)
         #rospy.Subscriber('/obstacle_waypoint', Int32, self.obstacle_cb)
 
         self.final_waypoints_pub = rospy.Publisher('final_waypoints', Lane, queue_size=1)
@@ -99,10 +100,9 @@ class WaypointUpdater(object):
         # No changes to trajectory
         if (self.stopline_wp_idx == -1) or (self.stopline_wp_idx >= last_idx):
             lane.waypoints = base_waypoints
-        
         # Action needed
-        #else:
-        #    lane.waypoints = self.brake_action(base_waypoints, closest_idx)
+        else:
+            lane.waypoints = self.brake_action(base_waypoints, closest_idx)
         
         return lane
         
@@ -110,10 +110,10 @@ class WaypointUpdater(object):
         # Array for brake waypoints to later be merged in
         brake = []
         # Enumerate over the list of waypoints
-        for i, wps in enumerate(waypoints):
+        for i, wp in enumerate(waypoints):
             # Add new Waypoint object
             o = Waypoint()
-            o.pose = wps.pose
+            o.pose = wp.pose
             # Center of car
             stop_idx = max(self.stopline_wp_idx - closest_idx - 2, 0)
             # Calculate distance to start to decelerate
@@ -125,7 +125,7 @@ class WaypointUpdater(object):
                 vel = 0.0
             
             # To reduce large square roots when the distance is far
-            o.twist.twist.linear.x = min(vel, wps.twist.twist.linear.x)
+            o.twist.twist.linear.x = min(vel, wp.twist.twist.linear.x)
             brake.append(o)
         
         return brake
@@ -148,8 +148,8 @@ class WaypointUpdater(object):
         # TODO: Callback for /traffic_waypoint message. Implement
         # you get the index of the waypoint that is closest to an upcoming red light, e.g. 12 for waypoints[12]
         # Target velocity should be set to 0 at this point so the car can smoothly stop there
-        pass
-        #self.stopline_wp_idx = msg.data
+        # pass
+        self.stopline_wp_idx = msg.data
 
     def obstacle_cb(self, msg):
         # TODO: Callback for /obstacle_waypoint message. We will implement it later
