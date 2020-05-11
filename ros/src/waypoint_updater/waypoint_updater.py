@@ -4,7 +4,7 @@ import rospy
 from geometry_msgs.msg import PoseStamped
 from styx_msgs.msg import Lane, Waypoint
 import numpy as np
-from scipy.spatial import KDTree
+from scipy import spatial
 
 import math
 
@@ -141,14 +141,14 @@ class WaypointUpdater(object):
         if not self.waypoints_2d:
             self.waypoints_2d = [[waypoint.pose.pose.position.x, waypoint.pose.pose.position.y] for waypoint in waypoints.waypoints]
             # build a KD Tree to speed up searching for waypoints in the future
-            self.waypoint_tree = KDTree(self.waypoints_2d)
+            self.waypoint_tree = spatial.KDTree(self.waypoints_2d)
 
     def traffic_cb(self, msg):
         # TODO: Callback for /traffic_waypoint message. Implement
         # you get the index of the waypoint that is closest to an upcoming red light, e.g. 12 for waypoints[12]
         # Target velocity should be set to 0 at this point so the car can smoothly stop there
-        pass
-        #self.stopline_wp_idx = msg.data
+        #pass
+        self.stopline_wp_idx = msg.data
 
     def obstacle_cb(self, msg):
         # TODO: Callback for /obstacle_waypoint message. We will implement it later
