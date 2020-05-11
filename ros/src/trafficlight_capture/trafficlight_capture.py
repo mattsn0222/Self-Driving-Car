@@ -194,7 +194,8 @@ class TLCapture(object):
                 self.save_image(msg, "3")
 
     def perform_detect_custom(self, cv_image):
-        cv_image=cv2.resize(cv_image, (224,168))
+        cv_image=cv2.resize(cv_image, (224,224))
+        #TODO: is a BGR2RGB conversion needed?
         inference_result = self.tf_session.run(self.result_tensor,
                             feed_dict={self.input_tensor: (cv_image,), self.keras_learning: 0})
 

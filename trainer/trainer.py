@@ -45,13 +45,13 @@ preprocess_flag = True # Should be true for ImageNet pre-trained typically
 
 # We can use smaller than the default 299x299x3 input for InceptionV3
 # which will speed up training. Keras v2.0.9 supports down to 139x139x3
-input_size = (224,168,3)
+input_size = (224,224,3)
 
 
 
 mobilenet = MobileNet(input_shape=input_size, include_top=False,
     classes = 3,
-    weights=None)
+    weights="imagenet")
 
 if freeze_flag == True:
     ## TODO: Iterate through the layers of the Inception model
@@ -61,7 +61,7 @@ if freeze_flag == True:
 
 
 # Makes the input placeholder layer 32x32x3 for CIFAR-10
-input_ph = Input(shape=(168,224,3), name = "input_tensor")
+input_ph = Input(shape=(224,224,3), name = "input_tensor")
 
 
 # Feeds the re-sized input into Inception model
@@ -97,18 +97,20 @@ datagen_valid = ImageDataGenerator(preprocessing_function=preprocess_input)
 
 
 train_gen = datagen_train.flow_from_directory(directory="data/training",
-    target_size=(168, 224),
+    target_size=(224, 224),
     color_mode="rgb",
     class_mode="categorical",
+    classes=["0", "1", "2", "3"],
     batch_size=BATCH_SIZE,
     shuffle=True
 )
 
 
 valid_gen = datagen_valid.flow_from_directory(directory="data/validation",
-    target_size=(168, 224),
+    target_size=(224, 224),
     color_mode="rgb",
     class_mode="categorical",
+    classes=["0", "1", "2", "3"],
     batch_size=BATCH_SIZE,
     shuffle=True
 )
@@ -119,7 +121,7 @@ model.fit_generator(train_gen,
                     steps_per_epoch = train_gen.samples // BATCH_SIZE,
                     validation_data = valid_gen, 
                     validation_steps = valid_gen.samples // BATCH_SIZE,
-                    epochs = 16, verbose=1)
+                    epochs = 20, verbose=1)
 
 print(model.output.op.name)
 frozen_graph = freeze_session(K.get_session(),
