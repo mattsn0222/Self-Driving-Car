@@ -3,7 +3,7 @@ import rospy
 from std_msgs.msg import Int32
 from geometry_msgs.msg import PoseStamped, Pose
 from styx_msgs.msg import TrafficLightArray, TrafficLight
-from styx_msgs.msg import Lane
+from styx_msgs.msg import Lane, Waypoint
 from sensor_msgs.msg import Image
 from cv_bridge import CvBridge
 from light_classification.tl_classifier import TLClassifier
@@ -11,7 +11,6 @@ from scipy import spatial
 import tf
 import cv2
 import yaml
-from scipy import spatial
 
 STATE_COUNT_THRESHOLD = 3
 
@@ -151,7 +150,7 @@ class TLDetector(object):
 
         """
         closest_light = None
-        sline_wp_idx = -1
+        stop_line_wp_idx = -1
         state = TrafficLight.UNKNOWN
 
         # List of positions that correspond to the line to stop in front of for a given intersection
@@ -170,13 +169,13 @@ class TLDetector(object):
                 if d >= 0 and d < diff:
                     diff = d
                     closest_light = light
-                    sline_wp_idx = temp_wp_idx
+                    stop_line_wp_idx = temp_wp_idx
 
         if closest_light:
             state = self.get_light_state(closest_light)
             
         #self.waypoints = None
-        return sline_wp_idx, state
+        return stop_line_wp_idx, state
     
 if __name__ == '__main__':
     try:
