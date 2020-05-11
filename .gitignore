@@ -6,3 +6,5 @@ ros/.idea
 data/dbw_test.rosbag.bag
 ros/src/twist_controller/*.csv
 ros/src/trafficlight_capture/data/
+trainer/checkpoint
+trainer/data/

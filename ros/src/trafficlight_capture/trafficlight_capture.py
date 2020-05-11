@@ -9,6 +9,7 @@ from cv_bridge import CvBridge
 from math import atan2, sqrt, degrees, asin, tan
 from datetime import datetime
 from os import mkdir
+import random
 import tf
 import cv2
 import yaml
@@ -17,8 +18,18 @@ import numpy as np
 import time
 from scipy.stats import norm
 from scipy import spatial
+from keras import backend as K
+
+SAVING_MODE = False
 
 SSD_GRAPH_FILE='ssd_mobilenet/frozen_inference_graph.pb'
+CUSTOM_GRAPH_FILE='/home/student/GitHub/Self-Driving-Car/trainer/model/my_model.pb'
+
+inference_map=["Red", "Yellow", "Green", "none"]
+
+def softmax(x):
+    e_x = np.exp(x - np.max(x))
+    return e_x / e_x.sum()
 
 def to_image_coords (boxes, height, width):
     box_coords=np.zeros_like(boxes)
@@ -46,6 +57,7 @@ def quaternion_to_euler(x, y, z, w):
     return X, Y, Z
 
 def load_graph(graph_file):
+    K.set_learning_phase(0)
     graph = tf.Graph()
     with graph.as_default():
         od_graph_def = tf.GraphDef()
@@ -60,15 +72,19 @@ STATE_COUNT_THRESHOLD = 3
 class TLCapture(object):
     def __init__(self):
 
-        self.init_tensorflow()
+        self.init_tensorflow_custom()
         rospy.init_node('trafficlight_capture')
 
         self.pose = None
         self.camera_image = None
         self.lights = []
-        self.sample_dir = "data"+ datetime.now().strftime("%m%d-%H%M%S/")
+        self.sample_dir = "data/"+ datetime.now().strftime("%m%d-%H%M%S/")
+        #make one directory per traffic light state
         mkdir(self.sample_dir)
-        self.csvf = open(self.sample_dir+"images.csv", "w")
+        for ds in ["training", "validation"]:
+            mkdir(self.sample_dir + "/" + ds)
+            for state in ['0', '1', '2', '3']:
+                mkdir(self.sample_dir + "/" + ds + "/" + state)
 
         sub1 = rospy.Subscriber('/current_pose', PoseStamped, self.pose_cb)
 
@@ -97,7 +113,21 @@ class TLCapture(object):
 
         rospy.spin()
 
-    def init_tensorflow(self):
+    def init_tensorflow_custom(self):
+        detection_graph = load_graph(CUSTOM_GRAPH_FILE)
+
+        # The input placeholder for the image.
+        self.input_tensor = detection_graph.get_tensor_by_name('input_tensor:0')
+
+        # The output of the inference
+        self.result_tensor = detection_graph.get_tensor_by_name('result_tensor/Reshape:0')
+
+        self.keras_learning = detection_graph.get_tensor_by_name('conv1_bn/keras_learning_phase:0')
+
+        self.tf_session = tf.Session(graph=detection_graph)
+
+
+    def init_tensorflow_sdd(self):
         detection_graph = load_graph(SSD_GRAPH_FILE)
 
         # The input placeholder for the image.
@@ -115,7 +145,18 @@ class TLCapture(object):
 
         self.tf_session = tf.Session(graph=detection_graph)
 
+    def save_image(self, msg, state_name):
+        dset_name = "training"
+        if (random.random() < 0.2):
+            dset_name = "validation"
+        cv_image_bgr = self.bridge.imgmsg_to_cv2(msg, "bgr8")
+        image_fname = datetime.now().strftime("%m%d-%H%M%S") + str(self.pose.header.seq) + ".png"
+        image_dirname = self.sample_dir + "/" + dset_name + "/" + state_name + "/"
+        cv2.imwrite(image_dirname + image_fname, cv_image_bgr)
+        print "saved ", image_fname
+
     def save_sample_image(self, msg):
+        may_be_visible = False
         for light in self.lights:
             lightx = light.pose.pose.position.x
             lighty = light.pose.pose.position.y
@@ -126,7 +167,7 @@ class TLCapture(object):
             dx = lightx-carx
             dy = lighty-cary
             dist = sqrt(dx*dx+dy*dy)
-            if (dist < 150 and dist > 22):
+            if (dist < 200 and dist > 5):
                 sign_relative_angle = np.rad2deg(atan2(dy, dx))
                 dz = lightz - carz
                 Xa, Ya, Za = quaternion_to_euler(self.pose.pose.orientation.x, self.pose.pose.orientation.y,
@@ -143,14 +184,28 @@ class TLCapture(object):
 
 
                 if abs(angle_difference) < angle_treshold:
-                    cv_image_bgr = self.bridge.imgmsg_to_cv2(msg, "bgr8")
-                    image_fname =  datetime.now().strftime("%m%d-%H%M%S")+ str(self.pose.header.seq) + ".png"
-                    cv2.imwrite(self.sample_dir + image_fname, cv_image_bgr)
-                    self.csvf.write(image_fname + "," + str(light.state) + "\n")
-                    self.csvf.flush()
-                    print "saved ", image_fname
+                    if dist < 150 and dist > 21:
+                        self.save_image(msg, str(light.state))
+                    else:
+                        may_be_visible = True
+        #also record "nothing" states
+        if may_be_visible == False:
+            if (random.random() < 0.1):
+                self.save_image(msg, "3")
 
+    def perform_detect_custom(self, cv_image):
+        cv_image=cv2.resize(cv_image, (224,168))
+        inference_result = self.tf_session.run(self.result_tensor,
+                            feed_dict={self.input_tensor: (cv_image,), self.keras_learning: 0})
 
+        print(inference_result)
+        best_guess = np.argmax(inference_result)
+        confidence = softmax(inference_result)
+        print "bg: ", best_guess, "conf: ", confidence
+
+        cv2.putText(cv_image, inference_map[best_guess],  (0, 150), cv2.FONT_HERSHEY_SIMPLEX, fontScale = 1, color=(255,255,255))
+
+        return cv_image
 
     def perform_detect(self, cv_image):
         (boxes, scores, classes) = self.tf_session.run([self.detection_boxes, self.detection_scores, self.detection_classes],
@@ -204,14 +259,15 @@ class TLCapture(object):
 
         """
 
-        # TODO: undistort the image if it is coming from the real car
-        self.save_sample_image(msg)
+        if SAVING_MODE:
+            # TODO: undistort the image if it is coming from the real car
+            self.save_sample_image(msg)
 
-        if (False):
+        else:
             cv_image = self.bridge.imgmsg_to_cv2(msg, "rgb8")
             rospy.logwarn("got image")
             #Get classification
-            self.perform_detect(cv_image)
+            cv_image = self.perform_detect_custom(cv_image)
 
             final_img = self.bridge.cv2_to_imgmsg(cv_image, "rgb8")
 
