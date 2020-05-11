@@ -6,7 +6,6 @@ from styx_msgs.msg import Lane, Waypoint
 from std_msgs.msg import Int32
 import numpy as np
 from scipy import spatial
-
 import math
 
 '''
@@ -25,8 +24,8 @@ TODO (for Yousuf and Aaron): Stopline location for each traffic light.
 '''
 
 LOOKAHEAD_WPS = 200 # Number of waypoints we will publish. You can change this number
-MAX_JERK = 10 # m/s2
-MAX_ACCEL = 10 # m/s2
+MAX_JERK = 0.5 # m/s2
+MAX_ACCEL = 0.5 # m/s2
 PUBLISH_RATE = 30 # the consumer (waypoint follower) is running at 30 Hz supposedly
 
 class WaypointUpdater(object):
@@ -55,8 +54,6 @@ class WaypointUpdater(object):
         rate = rospy.Rate(PUBLISH_RATE)
         while not rospy.is_shutdown():
             if self.pose and self.base_waypoints:
-                # Get closest waypoint
-                closest_waypoint_idx = self.get_closest_waypoint_idx()
                 self.publish_waypoints()
             rate.sleep()
     
