@@ -13,6 +13,7 @@ import cv2
 import yaml
 
 STATE_COUNT_THRESHOLD = 3
+LOGGING_RATE = 5  # Only log at this rate (1 / Hz)
 
 class TLDetector(object):
     def __init__(self):
@@ -58,6 +59,7 @@ class TLDetector(object):
         self.last_state = TrafficLight.UNKNOWN
         self.last_wp = -1
         self.state_count = 0
+        self.log_count = 0
 
         rospy.spin()
 
@@ -172,10 +174,23 @@ class TLDetector(object):
                     stop_line_wp_idx = temp_wp_idx
 
         if closest_light:
+            self.log_count += 1
             state = self.get_light_state(closest_light)
-            
+            if (self.log_count % LOGGING_RATE) == 0:
+                rospy.logwarn("DETECT: stop_line_wp_idx={}, state={}".format(stop_line_wp_idx, self.state_to_string(state)))
+
         #self.waypoints = None
         return stop_line_wp_idx, state
+    
+    def state_to_string(self, state):
+        out = "unknown"
+        if state == TrafficLight.GREEN:
+            out = "green"
+        elif state == TrafficLight.YELLOW:
+            out = "yellow"
+        elif state == TrafficLight.RED:
+            out = "red"
+        return out
     
 if __name__ == '__main__':
     try:
