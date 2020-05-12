@@ -4,8 +4,13 @@ from keras import backend as K
 import cv2
 import numpy as np
 import rospy
+import rospkg
 
-GRAPH_FILE='/home/student/GitHub/Self-Driving-Car/trainer/model/my_model4.pb'
+rospack = rospkg.RosPack()
+GRAPH_FILE=rospack.get_path('tl_detector')+'/my_model4.pb'
+rospy.loginfo("model path:"+GRAPH_FILE)
+
+#GRAPH_FILE='/home/student/GitHub/Self-Driving-Car/trainer/model/my_model4.pb'
 # alternative graph with no "None" state
 #GRAPH_FILE='/home/student/GitHub/Self-Driving-Car/trainer/model/my_model3.pb'
 
