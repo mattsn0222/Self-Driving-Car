@@ -9,7 +9,8 @@ import tensorflow as tf
 from keras.applications.mobilenet import MobileNet
 from keras import backend as K
 
-
+# I couldn't get the freeze_graph.py script working, so I took this approach to generate the pb file from
+# https://stackoverflow.com/questions/45466020/how-to-export-keras-h5-to-tensorflow-pb
 def freeze_session(session, keep_var_names=None, output_names=None, clear_devices=True):
     """
     Freezes the state of a session into a pruned computation graph.
@@ -38,24 +39,24 @@ def freeze_session(session, keep_var_names=None, output_names=None, clear_device
             session, input_graph_def, output_names, freeze_var_names)
         return frozen_graph
 
+#option to include "none" state or exclude it
+#CLASSES_TO_TRAIN=["0", "1", "2", "3"]
+CLASSES_TO_TRAIN=["0", "1", "2"]
+NUMBER_OF_CLASSES=len(CLASSES_TO_TRAIN)
+EPOCHS=10
 
-freeze_flag = False  # `True` to freeze layers, `False` for full training
+freeze_flag = False  # With frozen layers the results were much worse, so I let Keras retrain the whole model
 weights_flag = 'imagenet' # 'imagenet' or None
 preprocess_flag = True # Should be true for ImageNet pre-trained typically
 
-# We can use smaller than the default 299x299x3 input for InceptionV3
-# which will speed up training. Keras v2.0.9 supports down to 139x139x3
+# This is the largest supported size for the Keras application
 input_size = (224,224,3)
 
-
-
+# we have to remove the top to change the number of classes
 mobilenet = MobileNet(input_shape=input_size, include_top=False,
-    classes = 3,
-    weights="imagenet")
+    weights=weights_flag)
 
 if freeze_flag == True:
-    ## TODO: Iterate through the layers of the Inception model
-    ##       loaded above and set all of them to have trainable = False
     for layer in mobilenet.layers:
         layer.trainable = False
 
@@ -63,21 +64,16 @@ if freeze_flag == True:
 # Makes the input placeholder layer 32x32x3 for CIFAR-10
 input_ph = Input(shape=(224,224,3), name = "input_tensor")
 
-
-# Feeds the re-sized input into Inception model
-# You will need to update the model name if you changed it earlier!
 inp = mobilenet(input_ph)
 
-# Add back the missing top
+# Add back the missing top (based on the mobilenet.py in Keras)
 gap = GlobalAveragePooling2D() (inp)
 gap = Reshape((1,1,1024)) (gap)
 gap = Dropout(1e-3) (gap)
-gap = Conv2D (4, (1,1), padding='same', name='conv_preds') (gap)
+gap = Conv2D (NUMBER_OF_CLASSES, (1,1), padding='same', name='conv_preds') (gap)
 gap = Activation ('softmax', name='act_softmax') (gap)
-predictions = Reshape ((4,), name='result_tensor') (gap)
+predictions = Reshape ((NUMBER_OF_CLASSES,), name='result_tensor') (gap)
 
-
-# Creates the model, assuming your final layer is named "predictions"
 model = Model(inputs=input_ph, outputs=predictions)
 
 # Compile the model
@@ -100,7 +96,7 @@ train_gen = datagen_train.flow_from_directory(directory="data/training",
     target_size=(224, 224),
     color_mode="rgb",
     class_mode="categorical",
-    classes=["0", "1", "2", "3"],
+    classes=CLASSES_TO_TRAIN,
     batch_size=BATCH_SIZE,
     shuffle=True
 )
@@ -110,7 +106,7 @@ valid_gen = datagen_valid.flow_from_directory(directory="data/validation",
     target_size=(224, 224),
     color_mode="rgb",
     class_mode="categorical",
-    classes=["0", "1", "2", "3"],
+    classes=CLASSES_TO_TRAIN,
     batch_size=BATCH_SIZE,
     shuffle=True
 )
@@ -121,12 +117,12 @@ model.fit_generator(train_gen,
                     steps_per_epoch = train_gen.samples // BATCH_SIZE,
                     validation_data = valid_gen, 
                     validation_steps = valid_gen.samples // BATCH_SIZE,
-                    epochs = 20, verbose=1)
+                    epochs = EPOCHS, verbose=1)
 
 print(model.output.op.name)
 frozen_graph = freeze_session(K.get_session(),
                               output_names=[out.op.name for out in model.outputs])
 
-tf.train.write_graph(frozen_graph, "model", "my_model.pb", as_text=False)
+tf.train.write_graph(frozen_graph, "model", "my_model" + str(NUMBER_OF_CLASSES) + ".pb", as_text=False)
 
 

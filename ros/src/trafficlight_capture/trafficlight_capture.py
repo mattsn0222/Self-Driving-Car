@@ -19,17 +19,19 @@ import time
 from scipy.stats import norm
 from scipy import spatial
 from keras import backend as K
+from keras.applications.mobilenet import preprocess_input
 
 SAVING_MODE = False
 
 SSD_GRAPH_FILE='ssd_mobilenet/frozen_inference_graph.pb'
-CUSTOM_GRAPH_FILE='/home/student/GitHub/Self-Driving-Car/trainer/model/my_model.pb'
+CUSTOM_GRAPH_FILE='/home/student/GitHub/Self-Driving-Car/trainer/model/my_model4.pb'
 
-inference_map=["Red", "Yellow", "Green", "none"]
+inference_map=["Red ", "Yellow ", "Green ", "none "]
+
 
 def softmax(x):
     e_x = np.exp(x - np.max(x))
-    return e_x / e_x.sum()
+    return e_x / e_x.sum(axis=0)
 
 def to_image_coords (boxes, height, width):
     box_coords=np.zeros_like(boxes)
@@ -57,7 +59,6 @@ def quaternion_to_euler(x, y, z, w):
     return X, Y, Z
 
 def load_graph(graph_file):
-    K.set_learning_phase(0)
     graph = tf.Graph()
     with graph.as_default():
         od_graph_def = tf.GraphDef()
@@ -78,13 +79,14 @@ class TLCapture(object):
         self.pose = None
         self.camera_image = None
         self.lights = []
-        self.sample_dir = "data/"+ datetime.now().strftime("%m%d-%H%M%S/")
-        #make one directory per traffic light state
-        mkdir(self.sample_dir)
-        for ds in ["training", "validation"]:
-            mkdir(self.sample_dir + "/" + ds)
-            for state in ['0', '1', '2', '3']:
-                mkdir(self.sample_dir + "/" + ds + "/" + state)
+        if SAVING_MODE:
+            self.sample_dir = "data/"+ datetime.now().strftime("%m%d-%H%M%S/")
+            #make one directory per traffic light state
+            mkdir(self.sample_dir)
+            for ds in ["training", "validation"]:
+                mkdir(self.sample_dir + "/" + ds)
+                for state in ['0', '1', '2', '3']:
+                    mkdir(self.sample_dir + "/" + ds + "/" + state)
 
         sub1 = rospy.Subscriber('/current_pose', PoseStamped, self.pose_cb)
 
@@ -155,6 +157,24 @@ class TLCapture(object):
         cv2.imwrite(image_dirname + image_fname, cv_image_bgr)
         print "saved ", image_fname
 
+    def show_distance(self):
+        for light in self.lights:
+            lightx = light.pose.pose.position.x
+            lighty = light.pose.pose.position.y
+            carx = self.pose.pose.position.x
+            cary = self.pose.pose.position.y
+            dx = lightx-carx
+            dy = lighty-cary
+            dist = sqrt(dx*dx+dy*dy)
+            if (dist < 250 and dist > 5):
+                sign_relative_angle = np.rad2deg(atan2(dy, dx))
+                Xa, Ya, Za = quaternion_to_euler(self.pose.pose.orientation.x, self.pose.pose.orientation.y,
+                                                 self.pose.pose.orientation.z, self.pose.pose.orientation.w)
+
+                angle_difference = ((sign_relative_angle - Za + 180) % 360) - 180
+                if (abs(angle_difference) < 15):
+                    print "dist: ", dist, "angle", angle_difference
+
     def save_sample_image(self, msg):
         may_be_visible = False
         for light in self.lights:
@@ -168,6 +188,7 @@ class TLCapture(object):
             dy = lighty-cary
             dist = sqrt(dx*dx+dy*dy)
             if (dist < 200 and dist > 5):
+                print "dist: ", dist
                 sign_relative_angle = np.rad2deg(atan2(dy, dx))
                 dz = lightz - carz
                 Xa, Ya, Za = quaternion_to_euler(self.pose.pose.orientation.x, self.pose.pose.orientation.y,
@@ -193,18 +214,23 @@ class TLCapture(object):
             if (random.random() < 0.1):
                 self.save_image(msg, "3")
 
+    def mobilenet_preprocess(self, cv_image):
+        x = cv_image/128.
+        x -= 0.5
+        return x
+
     def perform_detect_custom(self, cv_image):
         cv_image=cv2.resize(cv_image, (224,224))
+        #cv_image = cv2.cvtColor(cv_image, cv2.COLOR_BGR2RGB)
+        preprocessed_input = self.mobilenet_preprocess(cv_image)
         #TODO: is a BGR2RGB conversion needed?
         inference_result = self.tf_session.run(self.result_tensor,
-                            feed_dict={self.input_tensor: (cv_image,), self.keras_learning: 0})
+                            feed_dict={self.input_tensor: (preprocessed_input,), self.keras_learning: 0})
 
-        print(inference_result)
         best_guess = np.argmax(inference_result)
-        confidence = softmax(inference_result)
-        print "bg: ", best_guess, "conf: ", confidence
+        confidence = softmax(inference_result[0])
 
-        cv2.putText(cv_image, inference_map[best_guess],  (0, 150), cv2.FONT_HERSHEY_SIMPLEX, fontScale = 1, color=(255,255,255))
+        cv2.putText(cv_image, inference_map[best_guess] + str(confidence[best_guess]),  (0, 150), cv2.FONT_HERSHEY_SIMPLEX, fontScale = 1, color=(255,255,255))
 
         return cv_image
 
@@ -265,6 +291,7 @@ class TLCapture(object):
             self.save_sample_image(msg)
 
         else:
+            self.show_distance()
             cv_image = self.bridge.imgmsg_to_cv2(msg, "rgb8")
             rospy.logwarn("got image")
             #Get classification
