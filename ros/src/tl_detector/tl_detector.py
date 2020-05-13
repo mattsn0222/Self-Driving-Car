@@ -14,14 +14,14 @@ import yaml
 
 STATE_COUNT_THRESHOLD = 3
 LOGGING_RATE = 5  # Only log at this rate (1 / Hz)
-SIMULATED_LIGHTS=False
+SIMULATED_LIGHTS=True
 
 class TLDetector(object):
     def __init__(self):
         rospy.init_node('tl_detector')
 
         self.pose = None
-        self.waypoints = None
+        self.base_waypoints = None
         self.waypoints_2d = None
         self.waypoint_tree = None
             
@@ -74,7 +74,7 @@ class TLDetector(object):
         self.pose = msg
 
     def waypoints_cb(self, waypoints):
-        self.waypoints = waypoints
+        self.base_waypoints = waypoints
         if not self.waypoints_2d:
             self.waypoints_2d = [[waypoint.pose.pose.position.x, waypoint.pose.pose.position.y] for waypoint in waypoints.waypoints]
             # Build a KD Tree to speed up searching for waypoints in the future
@@ -120,7 +120,7 @@ class TLDetector(object):
             pose (Pose): position to match a waypoint to
 
         Returns:
-            int: index of the closest waypoint in self.waypoints
+            int: index of the closest waypoint in self.base_waypoints
 
         """
         #TODO implement
@@ -171,7 +171,7 @@ class TLDetector(object):
             car_position = self.get_closest_waypoint(self.pose.pose.position.x, self.pose.pose.position.y)
             if car_position != -1:
                 #TODO find the closest visible traffic light (if one exists)
-                diff = len(self.waypoints.waypoints)
+                diff = len(self.base_waypoints.waypoints)
                 for i, light in enumerate(self.lights):
                     # Get stop line waypoint index
                     line = stop_line_positions[i]
@@ -187,9 +187,9 @@ class TLDetector(object):
             self.log_count += 1
             state = self.get_light_state(closest_light)
             if (self.log_count % LOGGING_RATE) == 0:
-                rospy.logwarn("DETECT: stop_line_wp_idx={}, state={}".format(stop_line_wp_idx, self.state_to_string(state)))
+                rospy.logwarn("DETECT: stop_line_wp_idx={}, state={}, car_position={}".format(stop_line_wp_idx, self.state_to_string(state), car_position))
 
-        #self.waypoints = None
+        #self.base_waypoints = None
         return stop_line_wp_idx, state
     
     def state_to_string(self, state):
