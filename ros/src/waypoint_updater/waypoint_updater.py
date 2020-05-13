@@ -27,6 +27,7 @@ LOOKAHEAD_WPS = 50 # Number of waypoints we will publish. You can change this nu
 MAX_JERK = 0.5 # m/s2
 MAX_ACCEL = 0.5 # m/s2
 PUBLISH_RATE = 30 # the consumer (waypoint follower) is running at 30 Hz supposedly
+DEBUG_BRAKEACTION = True
 
 class WaypointUpdater(object):
     def __init__(self):
@@ -47,6 +48,7 @@ class WaypointUpdater(object):
         self.waypoints_2d = None
         self.waypoint_tree = None
         self.stopline_wp_idx = -1
+        self.prev_stopline_wp_idx = -1
 
         self.loop()
     
@@ -105,16 +107,30 @@ class WaypointUpdater(object):
     def brake_action(self, waypoints, closest_idx):
         # Array for brake waypoints to later be merged in
         brake = []
+
         # Enumerate over the list of waypoints
+        total_dist = 0.0
+        
         for i, wp in enumerate(waypoints):
             # Add new Waypoint object
             o = Waypoint()
             o.pose = wp.pose
+            linear_vel = wp.twist.twist.linear.x
             # Center of car
             stop_idx = max(self.stopline_wp_idx - closest_idx - 2, 0)
             # Calculate distance to start to decelerate
             dist = self.distance(waypoints, i, stop_idx)
-            vel = math.sqrt(2*MAX_JERK*dist)
+            if total_dist == 0.0:
+                total_dist = dist
+            # from walk through
+            # vel = math.sqrt(2*MAX_JERK*dist)
+            # linear deceleration
+            if linear_vel >= 3.5:
+                vel = math.sqrt(2*MAX_JERK*dist)
+            elif total_dist < 10.0:
+                vel = math.sqrt(2*MAX_JERK*dist)
+            else:
+                vel = wp.twist.twist.linear.x * dist / total_dist
             
             # If the car is barely moving stop the car
             if vel < 1.0:
@@ -123,7 +139,11 @@ class WaypointUpdater(object):
             # To reduce large square roots when the distance is far
             o.twist.twist.linear.x = min(vel, wp.twist.twist.linear.x)
             brake.append(o)
+            if (DEBUG_BRAKEACTION):
+                if (self.stopline_wp_idx != self.prev_stopline_wp_idx and not vel==0.0):
+                    rospy.logwarn("Brake: idx={}, stop_idx={}, vel={:.1f}, cur_vel={:.1f}, total_dist={:.1f}, dist={:.1f}".format(i, stop_idx, vel, wp.twist.twist.linear.x, total_dist, dist))
         
+        self.prev_stopline_wp_idx = self.stopline_wp_idx
         return brake
 
     def pose_cb(self, msg):
