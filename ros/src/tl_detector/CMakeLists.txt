@@ -1,6 +1,15 @@
 cmake_minimum_required(VERSION 2.8.3)
 project(tl_detector)
 
+set(make_darknet_DIR ${CMAKE_CURRENT_SOURCE_DIR}/darknet)
+add_custom_command(OUTPUT ${CMAKE_CURRENT_SOURCE_DIR}/darknet/libdarknet.so
+  COMMAND make
+  WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/darknet"
+  COMMENT "Fable"
+  VERBATIM
+)
+add_custom_target(make_darknet ALL DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/darknet/libdarknet.so)
+
 ## Add support for C++11, supported in ROS Kinetic and newer
 # add_definitions(-std=c++11)
 
@@ -15,6 +24,7 @@ find_package(catkin REQUIRED COMPONENTS
   std_msgs
   styx_msgs
   waypoint_updater
+  make_darknet
 )
 
 ## System dependencies are found with CMake's conventions
