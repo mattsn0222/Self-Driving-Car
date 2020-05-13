@@ -2,6 +2,9 @@
 # Script to setup environment
 
 cd ..
+pip install gevent gevent-websocket python-socketio attrdict
+sudo apt-get install python-numpy python-scipy
+
 # Docker Setup
 sudo apt-get update
 sudo apt-get install \
@@ -16,7 +19,7 @@ sudo add-apt-repository \
 $(lsb_release -cs) \
 stable"
 sudo apt-get update
-$ sudo apt-get install docker-ce docker-ce-cli containerd.io
+sudo apt-get install docker-ce docker-ce-cli containerd.io
 sudo docker run hello-world
 
 sudo groupadd docker
@@ -24,8 +27,6 @@ sudo usermod -aG docker $USER
 newgrp docker
 docker run hello-world
 
-pip install gevent gevent-websocket python-socketio attrdict
-sudo apt-get install python-numpy python-scipy
-pip install tensorflow=="1.3.0rc0"
+sudo docker pull tensorflow/tensorflow:1.3.0
 
 cd Self-Driving-Car
