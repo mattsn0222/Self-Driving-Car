@@ -40,10 +40,10 @@ def freeze_session(session, keep_var_names=None, output_names=None, clear_device
         return frozen_graph
 
 #option to include "none" state or exclude it
-#CLASSES_TO_TRAIN=["0", "1", "2", "3"]
-CLASSES_TO_TRAIN=["0", "1", "2"]
+CLASSES_TO_TRAIN=["0", "1", "2", "3"]
+#CLASSES_TO_TRAIN=["0", "1", "2"]
 NUMBER_OF_CLASSES=len(CLASSES_TO_TRAIN)
-EPOCHS=10
+EPOCHS=8
 
 freeze_flag = False  # With frozen layers the results were much worse, so I let Keras retrain the whole model
 weights_flag = 'imagenet' # 'imagenet' or None
