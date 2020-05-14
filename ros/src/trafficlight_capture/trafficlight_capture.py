@@ -20,10 +20,24 @@ from scipy.stats import norm
 from scipy import spatial
 from keras import backend as K
 from keras.applications.mobilenet import preprocess_input
+from ssd_output_decoder import decode_detections
 
-SAVING_MODE = False
+class OperationMode():
+    CAPTURE = 1
+    SSD_DETECT = 2
+    MOBILENET_DETECT = 4
+    DARKNET_DETECT = 8
+    SSD7_DETECT = 16
+
+OPERATION_MODE=OperationMode.SSD7_DETECT
+
+if OPERATION_MODE&OperationMode.DARKNET_DETECT:
+    from darknet_interface import darknet_detect
+    from darknet_interface import darknet_initialize
+
 
 SSD_GRAPH_FILE='ssd_mobilenet/frozen_inference_graph.pb'
+SSD7_GRAPH_FILE='ssd7/my_ssd7_model.pb'
 CUSTOM_GRAPH_FILE='/home/student/GitHub/Self-Driving-Car/trainer/model/my_model4.pb'
 
 inference_map=["Red ", "Yellow ", "Green ", "none "]
@@ -73,13 +87,22 @@ STATE_COUNT_THRESHOLD = 3
 class TLCapture(object):
     def __init__(self):
 
-        self.init_tensorflow_custom()
+        if OPERATION_MODE&OperationMode.SSD_DETECT:
+            self.init_tensorflow_ssd()
+        if OPERATION_MODE & OperationMode.SSD7_DETECT:
+                self.init_tensorflow_ssd7()
+        if OPERATION_MODE&OperationMode.MOBILENET_DETECT:
+            self.init_tensorflow_custom()
+
+        if OPERATION_MODE&OperationMode.DARKNET_DETECT:
+            darknet_initialize()
+
         rospy.init_node('trafficlight_capture')
 
         self.pose = None
         self.camera_image = None
         self.lights = []
-        if SAVING_MODE:
+        if OPERATION_MODE&OperationMode.CAPTURE != 0:
             self.sample_dir = "data/"+ datetime.now().strftime("%m%d-%H%M%S/")
             #make one directory per traffic light state
             mkdir(self.sample_dir)
@@ -129,7 +152,7 @@ class TLCapture(object):
         self.tf_session = tf.Session(graph=detection_graph)
 
 
-    def init_tensorflow_sdd(self):
+    def init_tensorflow_ssd(self):
         detection_graph = load_graph(SSD_GRAPH_FILE)
 
         # The input placeholder for the image.
@@ -146,6 +169,26 @@ class TLCapture(object):
         self.detection_classes = detection_graph.get_tensor_by_name('detection_classes:0')
 
         self.tf_session = tf.Session(graph=detection_graph)
+
+    def init_tensorflow_ssd7(self):
+
+        detection_graph = load_graph(SSD7_GRAPH_FILE)
+
+        #ops = detection_graph.get_operations()
+        #for ooo in ops:
+        #    print (ooo)
+
+        # The input placeholder for the image.
+        self.input_tensor = detection_graph.get_tensor_by_name('input_1:0')
+
+        self.keras_learning = detection_graph.get_tensor_by_name('keras_learning_phase:0')
+
+
+
+        self.detection = detection_graph.get_tensor_by_name('predictions/concat:0')
+
+        self.tf_session = tf.Session(graph=detection_graph)
+
 
     def save_image(self, msg, state_name):
         dset_name = "training"
@@ -187,7 +230,7 @@ class TLCapture(object):
             dx = lightx-carx
             dy = lighty-cary
             dist = sqrt(dx*dx+dy*dy)
-            if (dist < 200 and dist > 5):
+            if (dist < 250 and dist > 5):
                 print "dist: ", dist
                 sign_relative_angle = np.rad2deg(atan2(dy, dx))
                 dz = lightz - carz
@@ -205,7 +248,7 @@ class TLCapture(object):
 
 
                 if abs(angle_difference) < angle_treshold:
-                    if dist < 150 and dist > 21:
+                    if dist < 250 and dist > 21:
                         self.save_image(msg, str(light.state))
                     else:
                         may_be_visible = True
@@ -234,7 +277,37 @@ class TLCapture(object):
 
         return cv_image
 
-    def perform_detect(self, cv_image):
+    def perform_detect_ssd7(self, cv_image):
+        cv_image = cv2.resize(cv_image, (416, 416))
+        cv_image_rgb = cv2.cvtColor(cv_image, cv2.COLOR_BGR2RGB)
+
+        cv_image_rgb = np.reshape(cv_image_rgb, (1, 416, 416, 3))
+        y_pred = self.tf_session.run(self.detection,
+                            feed_dict={self.input_tensor: cv_image_rgb, self.keras_learning: 0})
+        y_pred_decoded = decode_detections(y_pred,
+                                           confidence_thresh=0.2,
+                                           iou_threshold=0.45,
+                                           top_k=200,
+                                           normalize_coords=True,
+                                           img_height=cv_image.shape[0],
+                                           img_width=cv_image.shape[1])
+
+        print "decoded ypred: ", y_pred_decoded
+        boxColors = [(0, 255, 255), (0, 0, 255), (0, 255, 0)]
+        if len(y_pred_decoded) > 0:
+            for sss in y_pred_decoded:
+                if len(sss) == 0:
+                    continue
+                cls, conf, xmin, ymin, xmax, ymax = sss[0]
+                boxColor = boxColors[int(cls) - 1]
+                cv2.rectangle(cv_image, (int(xmin), int(ymin)),
+                              (int(xmax), int(ymax)), boxColor, 2)
+
+        return cv_image
+
+    def perform_detect_ssd(self, cv_image):
+        cv_image = cv2.resize(cv_image, (300, 300))
+        preprocessed_input = self.mobilenet_preprocess(cv_image)
         (boxes, scores, classes) = self.tf_session.run([self.detection_boxes, self.detection_scores, self.detection_classes],
                                             feed_dict={self.image_tensor: (cv_image, )})
 
@@ -244,7 +317,7 @@ class TLCapture(object):
         classes = np.squeeze(classes)
 
         n = len(classes)
-        min_score = 0.8
+        min_score = 0.25
         idxs=[]
         for i in range(n):
             if scores[i] >= min_score:
@@ -261,11 +334,31 @@ class TLCapture(object):
 
         return cv_image
 
+    def perform_detect_darknet(self, cv_image):
+        res = darknet_detect(cv_image)
+
+        for detection in res:
+            color = (255,255,255)
+            if detection[1] == 9:
+                color = (0,0,255)
+            box = detection[3]
+            cv2.rectangle(cv_image, (box[0], box[1]), (box[2], box[3]), color=color, thickness=2)
+
+
+        print res
+        return cv_image
+
+        height, width, _ = cv_image.shape
+        box_coords = to_image_coords(filtered_boxes, height, width)
+
+        self.draw_boxes(cv_image, box_coords, filtered_classes)
+
+        return cv_image
 
     def draw_boxes(self, cv_image, box_coords, classes):
         for box, cls in zip(box_coords, classes):
             color = (255,255,255)
-            if cls == 8:
+            if cls == 10:
                 color = (0,0,255)
             cv2.rectangle(cv_image, (box[1],box[0]), (box[3], box[2]), color=color, thickness=2)
 
@@ -285,20 +378,28 @@ class TLCapture(object):
             msg (Image): image from car-mounted camera
 
         """
-
-        if SAVING_MODE:
+        if OPERATION_MODE & OperationMode.CAPTURE:
             # TODO: undistort the image if it is coming from the real car
             self.save_sample_image(msg)
 
-        else:
+        if OPERATION_MODE & (OperationMode.DARKNET_DETECT | OperationMode.SSD_DETECT | OperationMode.SSD7_DETECT | OperationMode.MOBILENET_DETECT):
             self.show_distance()
             cv_image = self.bridge.imgmsg_to_cv2(msg, "rgb8")
             rospy.logwarn("got image")
             #Get classification
-            cv_image = self.perform_detect_custom(cv_image)
+            if OPERATION_MODE & (OperationMode.SSD_DETECT):
+                cv_image = self.perform_detect_ssd(cv_image)
+
+            if OPERATION_MODE & (OperationMode.SSD7_DETECT):
+                cv_image = self.perform_detect_ssd7(cv_image)
+
+            if OPERATION_MODE & (OperationMode.MOBILENET_DETECT):
+                cv_image = self.perform_detect_custom(cv_image)
+
+            if OPERATION_MODE & (OperationMode.DARKNET_DETECT):
+                cv_image = self.perform_detect_darknet(cv_image)
 
             final_img = self.bridge.cv2_to_imgmsg(cv_image, "rgb8")
-
             self.image_pub.publish(final_img)
 
 
