@@ -118,6 +118,7 @@ class TLDetector(object):
             self.upcoming_red_light_pub.publish(Int32(self.last_wp))
         self.state_count += 1
 
+    def image_cb_color(self, msg):
         self.camera_image_is_raw = False
         self.image_cb(msg)
 
