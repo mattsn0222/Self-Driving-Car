@@ -28,6 +28,7 @@ class TLDetector(object):
             
         self.camera_image = None
         self.camera_image_is_raw = False
+        self.has_image_color = False
         self.lights = []
         self.waypoints_2d = None
         self.waypoint_tree = None
@@ -119,12 +120,14 @@ class TLDetector(object):
         self.state_count += 1
 
     def image_cb_color(self, msg):
+        self.has_image_color = True
         self.camera_image_is_raw = False
         self.image_cb(msg)
 
     def image_cb_raw(self, msg):
-        self.camera_image_is_raw = True
-        self.image_cb(msg)
+        if self.has_image_color == False:
+            self.camera_image_is_raw = True
+            self.image_cb(msg)
 
     def get_closest_waypoint(self, x, y):
         """Identifies the closest path waypoint to the given position
@@ -165,7 +168,7 @@ class TLDetector(object):
             cv_image = self.bridge.imgmsg_to_cv2(self.camera_image, "bgr8")
         else:
             cv_image = self.bridge.imgmsg_to_cv2(self.camera_image, "bayer_grbg8")
-            cv_image = cv2.cvtColor(cv_image, cv2.COLOR_BayerGB2RGB) # cv2 name GB is from "bayer_grbg"[-1:-2]
+            cv_image = cv2.cvtColor(cv_image, cv2.COLOR_BayerGB2BGR) # cv2 name GB is from "bayer_grbg"[-1:-2]
             #rospy.loginfo("raw image seq %d size %d,%d", self.camera_image.header.seq, cv_image.shape[0], cv_image.shape[1])
 
         #Get classification
@@ -181,7 +184,7 @@ class TLDetector(object):
             elif result == TrafficLight.RED:
                 color=(255, 0, 0)
             dbgimg = cv2.circle(cv_image, (20,20), 10, color,-1)
-            cv2.imwrite('/home/student/shared/ros_image/raw_%04d.png'%self.camera_image.header.seq, cv2.cvtColor(dbgimg, cv2.COLOR_RGB2BGR))
+            cv2.imwrite('/home/student/shared/ros_image/raw_%04d.png'%self.camera_image.header.seq, dbgimg) #, cv2.cvtColor(dbgimg, cv2.COLOR_RGB2BGR))
 
         return result
 
