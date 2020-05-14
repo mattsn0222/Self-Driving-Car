@@ -12,9 +12,10 @@ import tf
 import cv2
 import yaml
 
+
 STATE_COUNT_THRESHOLD = 3
 LOGGING_RATE = 5  # Only log at this rate (1 / Hz)
-SIMULATED_LIGHTS=True
+SIMULATED_LIGHTS=False
 
 class TLDetector(object):
     def __init__(self):
@@ -26,6 +27,7 @@ class TLDetector(object):
         self.waypoint_tree = None
             
         self.camera_image = None
+        self.camera_image_is_raw = False
         self.lights = []
         self.waypoints_2d = None
         self.waypoint_tree = None
@@ -62,7 +64,8 @@ class TLDetector(object):
         rely on the position of the light and the camera image to predict it.
         '''
         sub3 = rospy.Subscriber('/vehicle/traffic_lights', TrafficLightArray, self.traffic_cb)
-        sub6 = rospy.Subscriber('/image_color', Image, self.image_cb)
+        sub6 = rospy.Subscriber('/image_color', Image, self.image_cb_color)
+        sub7 = rospy.Subscriber('/image_raw', Image, self.image_cb_raw)
 
 
         self.upcoming_red_light_pub = rospy.Publisher('/traffic_waypoint', Int32, queue_size=1)
@@ -93,6 +96,8 @@ class TLDetector(object):
         """
         self.has_image = True
         self.camera_image = msg
+        #rospy.loginfo("image raw %d seq %d", self.camera_image_is_raw, self.camera_image.header.seq)
+
         light_wp, state = self.process_traffic_lights()
 
         '''
@@ -112,6 +117,13 @@ class TLDetector(object):
         else:
             self.upcoming_red_light_pub.publish(Int32(self.last_wp))
         self.state_count += 1
+
+        self.camera_image_is_raw = False
+        self.image_cb(msg)
+
+    def image_cb_raw(self, msg):
+        self.camera_image_is_raw = True
+        self.image_cb(msg)
 
     def get_closest_waypoint(self, x, y):
         """Identifies the closest path waypoint to the given position
@@ -147,10 +159,30 @@ class TLDetector(object):
             self.prev_light_loc = None
             return TrafficLight.UNKNOWN
 
-        cv_image = self.bridge.imgmsg_to_cv2(self.camera_image, "bgr8")
+        cv_image = None
+        if (self.camera_image_is_raw==False):
+            cv_image = self.bridge.imgmsg_to_cv2(self.camera_image, "bgr8")
+        else:
+            cv_image = self.bridge.imgmsg_to_cv2(self.camera_image, "bayer_grbg8")
+            cv_image = cv2.cvtColor(cv_image, cv2.COLOR_BayerGB2RGB) # cv2 name GB is from "bayer_grbg"[-1:-2]
+            #rospy.loginfo("raw image seq %d size %d,%d", self.camera_image.header.seq, cv_image.shape[0], cv_image.shape[1])
 
         #Get classification
-        return self.light_classifier.get_classification(cv_image)
+        result = self.light_classifier.get_classification(cv_image)
+        # write annotated image for testing
+        write_annotated_image=False
+        if (self.camera_image_is_raw==True and write_annotated_image==True):
+            color=(0,0,0)
+            if result == TrafficLight.GREEN:
+                color=(0, 255, 0)
+            elif result == TrafficLight.YELLOW:
+                color=(255, 255, 0)
+            elif result == TrafficLight.RED:
+                color=(255, 0, 0)
+            dbgimg = cv2.circle(cv_image, (20,20), 10, color,-1)
+            cv2.imwrite('/home/student/shared/ros_image/raw_%04d.png'%self.camera_image.header.seq, cv2.cvtColor(dbgimg, cv2.COLOR_RGB2BGR))
+
+        return result
 
     def process_traffic_lights(self):
         """Finds closest visible traffic light, if one exists, and determines its
@@ -207,3 +239,4 @@ if __name__ == '__main__':
         TLDetector()
     except rospy.ROSInterruptException:
         rospy.logerr('Could not start traffic node.')
+
