@@ -36,7 +36,7 @@ def load_graph(graph_file):
 
 class TLClassifier(object):
     def __init__(self, is_site):
-        self.using_ssd7 = is_site
+        self.using_ssd7 = True#is_site
         # maybe load different classifier for site and for simulator
         #TODO make site-specific classifier
         if (self.using_ssd7):
@@ -72,7 +72,7 @@ class TLClassifier(object):
             int: ID of traffic light color (specified in styx_msgs/TrafficLight)
         """
         if (self.using_ssd7):
-            cv_image = cv2.resize(cv_image, (416, 416))
+            cv_image = cv2.resize(image, (416, 416))
             cv_image_rgb = cv2.cvtColor(cv_image, cv2.COLOR_BGR2RGB)
 
             cv_image_rgb = np.reshape(cv_image_rgb, (1, 416, 416, 3))
@@ -92,7 +92,7 @@ class TLClassifier(object):
                 if len(sss) == 0:
                     continue
                 cls, conf, xmin, ymin, xmax, ymax = sss[0]
-                votes[cls-1] += 1
+                votes[int(cls-1)] += 1
             if np.max(votes) != 0:
                 argm = np.argmax(votes)+1
 
