@@ -37,8 +37,8 @@ def load_graph(graph_file):
 class TLClassifier(object):
     def __init__(self, is_site):
         self.using_ssd7 = True#is_site
-        # maybe load different classifier for site and for simulator
-        #TODO make site-specific classifier
+        # Different classifiers for site and simulator
+        # Site-specific classifier
         if (self.using_ssd7):
             detection_graph = load_graph(SSD7_GRAPH_FILE)
 
