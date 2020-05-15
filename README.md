@@ -171,8 +171,10 @@ There are 2 possible solutions, either try to use CV tools to classify, or train
 Since the problem at hand was very similar to the Traffic Sign Classifier project, we trained a LeNet network to do the job.
 To prepare for real-life scenarios, we trained the network on 55,000 images from the LISA Traffic Light Dataset.
 The trainer code is in trainer/Traffic_Light_Classifier.ipynb, the combination of MobileNet and the secondary network is in trainer/Combined.ipynb
-While this is a very strong combination in real world situations, the MobileNet couldn't reliably detect the traffic light, and when it did, the
-secondary classifier had problems, especially with green light, often mistaking for yellow or red, due to the heavy yellow color from the frame.
+
+While this is a very strong combination in real world situations, in the parking lot MobileNet couldn't reliably detect the traffic light, and when it did, the
+secondary classifier had problems. Green light was classified yellow or red, due to the heavy yellow color from the frame.
+
 There are 3 ROSbag files which we used for testing, using the first word of the filename they're called Just, Loop and Train.
 The first 2 was promising, but the 3rd one had problems even on the pretrained MobileNet part.
 There're annotated videos about this solution for all 3 samples. (fablenet_train.mp4, fablenet_loop.mp4, fablenet_just.mp4)
@@ -241,11 +243,13 @@ Something about image_raw conversion, and why it is unnecessary to do
 
 There are 2 separate topics for image: image_color and image_raw.
 The simulator only sends image_color, the Just and the Loop ROSbag files only had image_raw, the Train ROSbag had both.
-The Traffic Light Detector subscribes for both topics. In case both topic has messages, the image_raw topic is not processed anymore.
+The Traffic Light Detector subscribes for both topics. If both topics have messages at the same time, image_color has priority.
 Ihe image_raw uses Bayer-encoded black and white image, which is converted to color using OpenCV.
 
 To obtain the images from the ROSbag files, the messages are converted to text:
-```rostopic echo /image_raw -b traffic_light_training.bag > training_image_raw```
+```
+rostopic echo /image_raw -b traffic_light_training.bag > training_image_raw
+```
 The resulting text file is converted to RGB image list with the `trainer/raw2img.py` script.
 
 #### Drive By Wire Node
