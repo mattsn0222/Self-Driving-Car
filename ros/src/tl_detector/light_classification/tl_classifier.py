@@ -22,10 +22,9 @@ inference_map_code_ssd7=[TrafficLight.YELLOW, TrafficLight.RED, TrafficLight.GRE
 class RunMode():
     NORMAL = 1
     ROSBAG_PLAYBACK = 2
+    GENERATE_IMAGES = 4
 
-RUN_MODE = RunMode.NORMAL
-
-hackhack = 0
+RUN_MODE = RunMode.NORMAL 
 
 def softmax(x):
     e_x = np.exp(x - np.max(x))
@@ -44,7 +43,8 @@ def load_graph(graph_file):
 class TLClassifier(object):
     def __init__(self, is_site):
         self.using_ssd7 = True
-        if RUN_MODE == RunMode.ROSBAG_PLAYBACK:
+        self.img_count = 0
+        if RUN_MODE & RunMode.ROSBAG_PLAYBACK:
             self.is_site = True
         else:
             self.is_site = is_site
@@ -85,21 +85,30 @@ class TLClassifier(object):
             # is the hood. Therefore we crop off the top left corner, which is the relevant part
             # (as long as the car is going clockwise - otherwise we should crop both the
             # top left and top right and run a recognition on both, adding the results)
+            orig_image=cv_image
             if self.is_site:
                 cv_image = cv_image[0:416, 0:554].copy()
+
+            # save it at this point, as this is the most useful for later image generation
+            img_height=cv_image.shape[0]
+            img_width=cv_image.shape[1]
+
             cv_image = cv2.resize(cv_image, (416, 416))
             cv_image_rgb = cv2.cvtColor(cv_image, cv2.COLOR_BGR2RGB)
 
             cv_images = np.reshape(cv_image_rgb, (1, 416, 416, 3))
             y_pred = self.tf_session.run(self.detection,
                                          feed_dict={self.input_tensor: cv_images, self.keras_learning: 0})
+
+
+
             y_pred_decoded = decode_detections(y_pred,
                                                confidence_thresh=0.7,
                                                iou_threshold=0.45,
                                                top_k=200,
                                                normalize_coords=True,
-                                               img_height=cv_image_rgb.shape[0],
-                                               img_width=cv_image_rgb.shape[1])
+                                               img_height=img_height,
+                                               img_width=img_width)
 
             votes=[0]*3
             argm = 3 # default is none
@@ -112,25 +121,23 @@ class TLClassifier(object):
 
             rospy.logwarn('Guessed ' + inference_map_text_ssd7[argm] + " votes(YRG) " + str(votes))
 
-            # --- debug
-            #global hackhack
-            #boxColors = [(255, 255, 0), (255, 0, 0), (0, 255, 0)]
-            #if len(y_pred_decoded) > 0:
-            #   y_pred_list = y_pred_decoded[0].tolist()
-            #   for sss in y_pred_list:
-            #       # print sss
-            #       cls, conf, xmin, ymin, xmax, ymax = sss
-            #       boxColor = boxColors[int(cls) - 1]
-            #       cv2.rectangle(cv_image_rgb, (int(xmin), int(ymin)),
-            #                     (int(xmax), int(ymax)), boxColor, 2)
-            #cv_image_rgb = cv2.putText(cv_image_rgb,
-            #                           'Guessed ' + inference_map_text_ssd7[argm] + str(votes),
-            #                           (50,50), cv2.FONT_HERSHEY_SIMPLEX,
-            #                           fontScale=0.5, color=(255,255,255), thickness=1)
-            #outimg = cv2.cvtColor(cv_image_rgb, cv2.COLOR_RGB2BGR)
-            #cv2.imwrite("recog_%04d.png" % hackhack, outimg)
-            #hackhack += 1
-            # ----
+            if RUN_MODE & RunMode.GENERATE_IMAGES:
+                boxColors = [(0, 255, 255), (0, 0, 255), (0, 255, 0)]
+                if len(y_pred_decoded) > 0:
+                   y_pred_list = y_pred_decoded[0].tolist()
+                   for sss in y_pred_list:
+                       # print sss
+                       cls, conf, xmin, ymin, xmax, ymax = sss
+                       boxColor = boxColors[int(cls) - 1]
+                       cv2.rectangle(orig_image, (int(xmin), int(ymin)),
+                                     (int(xmax), int(ymax)), boxColor, 2)
+                orig_image = cv2.putText(orig_image,
+                                           'Guessed ' + inference_map_text_ssd7[argm] + str(votes),
+                                           (50,50), cv2.FONT_HERSHEY_SIMPLEX,
+                                           fontScale=1, color=(255,255,255), thickness=2)
+                #outimg = cv2.cvtColor(orig_image, cv2.COLOR_RGB2BGR)
+                cv2.imwrite("recog_%04d.png" % self.img_count, orig_image)
+                self.img_count += 1
 
             return inference_map_code_ssd7[argm]
         else:

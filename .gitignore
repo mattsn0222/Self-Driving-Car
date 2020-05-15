@@ -14,3 +14,4 @@ trainer/training_ref.txt
 ros/src/tl_detector/my_model4.pb
 
 data/traffic_light_training.bag
+ros/src/tl_detector/089/
