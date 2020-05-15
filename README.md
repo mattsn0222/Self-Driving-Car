@@ -166,6 +166,19 @@ So we looked at pulling in darknet, the original execution environment of
       side-facing traffic lights, missed traffic lights, major difficulties
        with the parking lot scenario).
 
+The secondary classifier works on small images, once the primary classifier identified the box of a traffic light.
+There are 2 possible solutions, either try to use CV tools to classify, or train a separate neural network.
+Since the problem at hand was very similar to the Traffic Sign Classifier project, we trained a LeNet network to do the job.
+To prepare for real-life scenarios, we trained the network on 55,000 images from the LISA Traffic Light Dataset.
+The trainer code is in trainer/Traffic_Light_Classifier.ipynb, the combination of MobileNet and the secondary network is in trainer/Combined.ipynb
+
+While this is a very strong combination in real world situations, in the parking lot MobileNet couldn't reliably detect the traffic light, and when it did, the
+secondary classifier had problems. Green light was classified yellow or red, due to the heavy yellow color from the frame.
+
+There are 3 ROSbag files which we used for testing, using the first word of the filename they're called Just, Loop and Train.
+The first 2 was promising, but the 3rd one had problems even on the pretrained MobileNet part.
+There're annotated videos about this solution for all 3 samples. (fablenet_train.mp4, fablenet_loop.mp4, fablenet_just.mp4)
+
 The results:
   TODO SOME GRAPHICS/VIDEO
      
@@ -208,6 +221,17 @@ The next challenge was to obtain an augmented dataset which includes color
    results. The performance of the model never reached 100%, but when
     averaging 2 out of 3 detections the results were practically perfect.   
  
+The semi-automated annotation tool is in trainer/AutoAnnot.ipynb.
+It uses the manually edited annot_hint.txt file, and the images from the training ROSbag file.
+The numbers in the text file are the frame numbers, r/g/y is the color, which is the same for subsequent images, so only captured at changes.
+The tool tries to extract a bounding box, but sometimes only half the traffic light is identified, or extra boxes would appear.
+The text file is from manually checking all the images for complete boxes, and recording their numbers.
+When there's no box at all, the image is skipped automatically, which helps entering ranges.
+The detection algorithm on the LAB color model, which is good for identifing yellow. It's enhanched with CLAHE.
+Sobel finds vertical edges. After tresholding, HoughTransformP finds the lines.
+Lines are filtered so that they need to be mostly vertical, in pairs, and the resulting box width has to be 0.3 to 0.6 times the height.
+The result can be seen in annotated video form as traffic_lights_training_annot.mp4
+
 Here are some examples of how the network behaves on different datasets:
 
 TODO include GIFs for parking lot and simulator 
@@ -217,12 +241,16 @@ Something about image_raw conversion, and why it is unnecessary to do
  undistortion (since the training sets are more heavily distorted during
   training anyway)
 
+There are 2 separate topics for image: image_color and image_raw.
+The simulator only sends image_color, the Just and the Loop ROSbag files only had image_raw, the Train ROSbag had both.
+The Traffic Light Detector subscribes for both topics. If both topics have messages at the same time, image_color has priority.
+Ihe image_raw uses Bayer-encoded black and white image, which is converted to color using OpenCV.
 
- 
-
-
-
-
+To obtain the images from the ROSbag files, the messages are converted to text:
+```
+rostopic echo /image_raw -b traffic_light_training.bag > training_image_raw
+```
+The resulting text file is converted to RGB image list with the `trainer/raw2img.py` script.
 
 #### Drive By Wire Node
 
