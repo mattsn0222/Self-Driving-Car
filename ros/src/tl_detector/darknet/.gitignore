@@ -46,7 +46,6 @@ Thumbs.db
 .vscode/
 
 # Managed by CMake
-src/version.h
 
 # Build artifacts
 lib/
