@@ -1,9 +1,52 @@
-# Self Driving Car
+# Self Driving Car Capstone Project
+The goal of this project is to use Ros code to integrate with Carla, Udacity's Self Driving Car. To get there our team utilized a simulator that works very similarly to Carla to drive on a simulated highway with traffic lights. The project then transitions into the real world and is tested on Carla in a closed track to mimick various conditions similar to a real public road environment.
+
+[//]: # (Image References)
+
+[image1]: /img/final-project-ros-graph-v2.png "ROS System"
+
 ### Team
-1. Krishan Patel (kspatel95@gmail.com) 
-2. Tamás Kerecsen (kerecsen@gmail.com)
-3. Tomoya Matsumura (tomoya.matsumura@gmail.com)
-4. Gyorgy Blahut (fable3@gmail.com)
+| Name | Email |
+| :------------------------------- |:------------------------------------|
+| Krishan Patel (Team Leader)  | kspatel95@gmail.com |
+| Tamás Kerecsen                    | kerecsen@gmail.com |
+| Tomoya Matsumura               | tomoya.matsumura@gmail.com |
+| Gyorgy Blahut                        | fable3@gmail.com |
+
+### To get Ros code started (Simulator)
+```
+1. cd Self-Driving-Car
+2. ./run.sh
+```
+### If setup is needed for downloading required packages
+``` 
+./setup.sh
+```
+---
+
+## Ros System
+
+The Ros system utilized in the Simulator is intended to be modeled very similarly to the Udacity Self Driving Car. 
+
+![Final score][image1]
+
+### Main Components of the project
+---
+#### Waypoint Updater
+
+The simulated car as well as the self driving car both have waypoints that are given and feed into the Ros System. The car is given base waypoints and saves it but only looks at a portion of it that is relevant to the car. The car begins by finding the closest waypoint ahead of it and then only handles a certain number of waypoints ahead of it. Another task that the waypoint updater handles is any adjustments needed to be made for traffic lights or obstacles. This allows for the car to know when to begin slowing down, where the stop line is, and when to search for relevant traffic lights.
+
+#### Traffic Light Detection
+
+
+
+#### Drive By Wire Node
+
+The DBW Node uses the data coming from the waypoint updater to know when to apply different commands to throttle, braking, and steering. By default the car is going to throttle till it hits the speed limit or the vehicle limit, as the waypoints require some steering or braking the car relies on updates from the twist_controller.py. The Twist Controller  utilizes a combination of PID, a Low Pass Filter, and a Yaw Controller all to have a smoother and more effective response to control the car. The Twist Controller ensures that the car is able to make a full stop when needed, steer to stay within the lanes, and maintain speed when possible which feeds directly into the DBW Node when enabled.
+
+---
+
+### Udacity Capstone Project README
 
 This is the project repo for the final project of the Udacity Self-Driving Car Nanodegree: Programming a Real Self-Driving Car. For more information about the project, see the project introduction [here](https://classroom.udacity.com/nanodegrees/nd013/parts/6047fe34-d93c-4f50-8336-b70ef10cb4b2/modules/e1a23b06-329a-4684-a717-ad476f0d8dff/lessons/462c933d-9f24-42d3-8bdc-a08a5fc866e4/concepts/5ab4b122-83e6-436d-850f-9f4d26627fd9).
 

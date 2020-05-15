@@ -8,21 +8,6 @@ import numpy as np
 from scipy import spatial
 import math
 
-'''
-This node will publish waypoints from the car's current position to some `x` distance ahead.
-
-As mentioned in the doc, you should ideally first implement a version which does not care
-about traffic lights or obstacles.
-
-Once you have created dbw_node, you will update this node to use the status of traffic lights too.
-
-Please note that our simulator also provides the exact location of traffic lights and their
-current status in `/vehicle/traffic_lights` message. You can use this message to build this node
-as well as to verify your TL classifier.
-
-TODO (for Yousuf and Aaron): Stopline location for each traffic light.
-'''
-
 LOOKAHEAD_WPS = 50 # Number of waypoints we will publish. You can change this number
 MAX_JERK = 0.5 # m/s2
 MAX_ACCEL = 0.5 # m/s2
@@ -33,16 +18,16 @@ class WaypointUpdater(object):
     def __init__(self):
         rospy.init_node('waypoint_updater')
 
+        # Subscribers
         rospy.Subscriber('/current_pose', PoseStamped, self.pose_cb)
         rospy.Subscriber('/base_waypoints', Lane, self.waypoints_cb)
-
-        # TODO: Add a subscriber for /traffic_waypoint and /obstacle_waypoint below
         rospy.Subscriber('/traffic_waypoint', Int32, self.traffic_cb)
         #rospy.Subscriber('/obstacle_waypoint', Int32, self.obstacle_cb)
 
+        # Publishers
         self.final_waypoints_pub = rospy.Publisher('final_waypoints', Lane, queue_size=1)
 
-        # TODO: Add other member variables you need below
+        # Variables
         self.pose = None
         self.base_waypoints = None
         self.waypoints_2d = None
@@ -50,6 +35,7 @@ class WaypointUpdater(object):
         self.stopline_wp_idx = -1
         self.prev_stopline_wp_idx = -1
 
+        # Publish Loop
         self.loop()
     
     def loop(self):
@@ -73,7 +59,7 @@ class WaypointUpdater(object):
         prev_vect = np.array(prev_coord)
         pos_vect = np.array([x, y])
 
-        # take the dot product of the vector from the previous waypoint to the closest waypoint
+        # Take the dot product of the vector from the previous waypoint to the closest waypoint
         # and the vector from the closes waypoint to the car. If it is positive (the two vectors
         # point in the same direction), the car is past the current (closest) waypoint,
         # otherwise it is behind the current waypoint (heading for the closest waypoint)
@@ -89,9 +75,9 @@ class WaypointUpdater(object):
     
     def generate_trajectory(self):
         lane = Lane()
-        #lane.header = self.base_waypoints.header
         closest_idx = self.get_closest_waypoint_idx()
         last_idx = closest_idx + LOOKAHEAD_WPS
+        
         # Get the next section of waypoints
         base_waypoints = self.base_waypoints.waypoints[closest_idx:last_idx]
         
@@ -122,9 +108,8 @@ class WaypointUpdater(object):
             dist = self.distance(waypoints, i, stop_idx)
             if total_dist == 0.0:
                 total_dist = dist
-            # from walk through
-            # vel = math.sqrt(2*MAX_JERK*dist)
-            # linear deceleration
+            
+            # Linear deceleration
             if linear_vel >= 3.5:
                 vel = math.sqrt(2*MAX_JERK*dist)
             elif total_dist < 10.0:
@@ -147,13 +132,11 @@ class WaypointUpdater(object):
         return brake
 
     def pose_cb(self, msg):
-        # TODO: Implement
-        #pass
+        # Pose Callback
         self.pose = msg
 
     def waypoints_cb(self, waypoints):
-        # TODO: Implement
-        #save the base waypoints. This callback is supposed to be called only once
+        # Waypoint Callback, intended to only be used once to save base waypoints
         self.base_waypoints = waypoints
         if not self.waypoints_2d:
             self.waypoints_2d = [[waypoint.pose.pose.position.x, waypoint.pose.pose.position.y] for waypoint in waypoints.waypoints]
@@ -161,14 +144,13 @@ class WaypointUpdater(object):
             self.waypoint_tree = spatial.KDTree(self.waypoints_2d)
 
     def traffic_cb(self, msg):
-        # TODO: Callback for /traffic_waypoint message. Implement
+        # Callback for /traffic_waypoint message
         # you get the index of the waypoint that is closest to an upcoming red light, e.g. 12 for waypoints[12]
         # Target velocity should be set to 0 at this point so the car can smoothly stop there
-        # pass
         self.stopline_wp_idx = msg.data
 
     def obstacle_cb(self, msg):
-        # TODO: Callback for /obstacle_waypoint message. We will implement it later
+        # Callback for /obstacle_waypoint message
         pass
 
     def get_waypoint_velocity(self, waypoint):

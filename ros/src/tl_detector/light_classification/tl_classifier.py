@@ -48,7 +48,6 @@ class TLClassifier(object):
             self.is_site = True
         else:
             self.is_site = is_site
-
         if (self.using_ssd7):
             detection_graph = load_graph(SSD7_GRAPH_FILE)
 
