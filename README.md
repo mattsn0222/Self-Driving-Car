@@ -1,5 +1,5 @@
 # Self Driving Car Capstone Project
-The goal of this project is to use Ros code to integrate with Carla, Udacity's Self Driving Car. To get there our team utilized a simulator that works very similarly to Carla to drive on a simulated highway with traffic lights. The project then transitions into the real world and is tested on Carla in a closed track to mimick various conditions similar to a real public road environment.
+The goal of this project is to use ROS code to integrate with Carla, Udacity's Self Driving Car. To get there our team utilized a simulator that works very similarly to Carla to drive on a simulated highway with traffic lights. The project then transitions into the real world and is tested on Carla in a closed track to mimick various conditions similar to a real public road environment.
 
 [//]: # (Image References)
 
@@ -11,7 +11,7 @@ The goal of this project is to use Ros code to integrate with Carla, Udacity's S
 | Krishan Patel (Team Leader)  | kspatel95@gmail.com |
 | Tamás Kerecsen                    | kerecsen@gmail.com |
 | Tomoya Matsumura               | tomoya.matsumura@gmail.com |
-| Gyorgy Blahut                        | fable3@gmail.com |
+| György Blahut                        | fable3@gmail.com |
 
 ### To get Ros code started (Simulator)
 ```
@@ -26,7 +26,10 @@ The goal of this project is to use Ros code to integrate with Carla, Udacity's S
 
 ## Ros System
 
-The Ros system utilized in the Simulator is intended to be modeled very similarly to the Udacity Self Driving Car. 
+The ROS system utilized in the Simulator is intended to be modeled very similarly to the Udacity Self Driving Car. 
+The architecture of the ROS nodes was defined in the project repository, but
+some of the modules have not (or not fully) been implemented.
+Our task was to develop these missing portions, including the modules listed below.  
 
 ![Final score][image1]
 
@@ -34,9 +37,179 @@ The Ros system utilized in the Simulator is intended to be modeled very similarl
 ---
 #### Waypoint Updater
 
-The simulated car as well as the self driving car both have waypoints that are given and feed into the Ros System. The car is given base waypoints and saves it but only looks at a portion of it that is relevant to the car. The car begins by finding the closest waypoint ahead of it and then only handles a certain number of waypoints ahead of it. Another task that the waypoint updater handles is any adjustments needed to be made for traffic lights or obstacles. This allows for the car to know when to begin slowing down, where the stop line is, and when to search for relevant traffic lights.
+The simulated car as well as the self driving car are provided with 
+waypoints that our software receives through the ROS System. The Waypoint Updater 
+node is in charge of building a route with these waypoints, and continuously transferring
+the next points to tell the car where to go. 
+At startup, the car is given base waypoints for the entire route. 
+Our code only looks at a portion of the waypoints that is immediately relevant to the car. 
+It starts by finding the closest waypoint ahead of the car and 
+a certain number of waypoints further ahead, then makes any adjustments 
+needed based on traffic lights or obstacles.  
+If obstacles or traffic lights are detected, a path is planned that slows
+down ahead of the stop line or obstacle. 
 
 #### Traffic Light Detection
+
+The TLDetector node is responsible for receiving the camera image from an upward
+facing camera, and identifying if there are red or green lights ahead of the car.
+The node also receives a list of the traffic light locations and the corresponding 
+stop lines, which makes this task a bit easier.
+If a red light is identified, the node publishes a traffic_waypoint message,
+informing other nodes (primarily the waypoint updater) of the potential
+obstacle ahead.
+
+The TLDetector uses a neural network to identify the traffic lights and their
+color on the image. Selecting the type of neural network, and training it for the particular requirements
+of the project turned out to be a bit of a challenge.
+
+There are two very different scenarios where the visual classifier network
+has to function. One is the simulator, and the other one is the real world
+test track, where Carla runs. In addition to this challenge, Carla runs a very old
+Tensorflow 1.3 and Python 2.7 environment, that rules out many off-the-shelf solutions
+available in modern Keras and Python environments.
+
+We tried the approaches below with more or less success to find the best compromise between
+performance, recognition quality in the simulator and on the ROSbag recorded images
+ from the test track, as well as compatibility with the environment.
+ 
+##### Whole-image classifier
+The first approach we tried was the one we perfected in the Behavioral
+ Cloning section of the course: training a recognizer on entire pictures and
+ hoping it learns how to distinguish the traffic light colors automatically. 
+ We applied what we learned about Transfer Learning, took the MobileNet V1
+ 224x224 classifier (the only one available in this old version of Keras) and
+ tried to train it on images captured from the simulator.
+
+But first we needed an annotated image database that would allow training or
+hand-tuning the recognizers. So we created a tool  (`src
+/trafficlight_capturer`) that runs as a ROS node, and combines the gound
+truth information coming from the simulator in the `vehicle/traffic_lights`
+ROS topic with the images coming from the simulator in the `/image_color`
+topic and built a database of annotated images: images combined the traffic
+light state. 
+
+When traffic  lights should be visible based on the geometry, the tool saves
+ each incoming image to a folder structure that is compatible with the Keras
+   ImageDataGenerator (using the traffic light state helpfully provided by the simulator).
+Then I built a  trainer app (trainer/trainer.py) that takes these images and
+ retrains the MobileNet V1 sample in Keras with the images as input (I would
+  have  preferred to use MobileNet V2 or V3, but the ancient Keras version in
+   the  Udacity VM only has V1).
+
+
+So I decided  to try a simpler approach first, training a normal MobileNet
+ recognizer and hoping it would just recognize the entire image as a whole
+  without  any segmentation information. I enhanced my capture tool to
+   calculate  when traffic lights should be visible (based on the car
+    position,  car heading (coverted from Quarternions to normal heading), traffic light position).
+
+
+The resulting classifier worked acceptably well, once it was close enough, it
+ recognized the traffic light colors, but it was noisy and unpredictable when
+  farther away from the lights. It obviously didn't work for the real-world
+   scenario at all.
+   
+Although we probably fulfilled the project rubric with this classifier, we
+ decided to move on an try to find a more robust and universal solution.
+ 
+##### SSD-style classifer + secondary classifier
+The next obvious way to solve the problem of traffic light detection is to
+find an SSD-style one-shot classifier that is capable of finding the traffic
+lights in the image, and combine it with a secondary CV-based or neural
+network based subclassifier to identify the traffic light state (color). 
+The secondary classifier is necessary because off-the-shelf trained SSD
+classifiers are typically trained on the Coco database that doesn't
+distinguish between different colored traffic lights.
+
+There are two obvious candidates for an SSD style classifier that can run at a high
+framerate in the constrained hardware environment of a car. One is MobileNet SSD,
+and the other is Yolo. There are multiple configurations available for each, and we selected
+MobileNet SSD V1 224 from the Mobile Zoo as one candidate, and YoloV3-tiny
+-pnr as another one.  
+
+First, we integrated MobileNet SSD into the ROS environment. We included it
+ in the trafficlight_capture node, and outputted the detection results
+  (colored rectangles overlaid on the camera image) into a new
+  , `/image_recognized` ROS topic. This way we could observe how the model
+   was behaving using at real time with the help of `rqt_image_viewer`
+ 
+After lowering the threshold detection probability to 20%, it was finding
+ most of the traffic lights in the simulator, but it also found a lot of side
+ -facing and back-facing traffic lights as well. It also didn't do a whole
+  lot of recognizing with the real-world images from the ROSbag. 
+
+So after some research we identified the Yolo family as a potentially
+ acceptable trade-off between speed and quality. The full-blown YoloV4 was
+  too slow at least in the VM environment, but there was a very promising
+   candidate, YoloV3-tiny-PRN, which has a very  small 16MB parameter file and
+    runs at 10+ fps even in CPU-only mode. (see https://github.com/WongKinYiu
+    /PartialResidualNetworks and https://github.com/AlexeyAB/darknet).
+     
+Unfortunately Yolo natively runs under the darknet neural network development
+ tool, not Tensorflow. There are tensorflow ports of Yolo, but we didn't
+  manage to get any of them working (we backported a couple to python 2.7 and 
+  tensorflow 1.3, but for some reason the way they were loading the weights
+   - which involves a lot of bit shuffling and tensorflow surgery - failed in
+    our environment). It would have been possible to train such a model from
+     scratch, but it would have required more training hours than what we had
+      available in tthe workspace.
+      
+So we looked at pulling in darknet, the original execution environment of
+ Yolo, as a module into the python/ROS architecture we were building. We
+  managed to get a darknet .so library built with catkin-make, and call the
+   library from our python software, and were able to deeply test this option
+    as well.  It worked better than MobileNet SSD did, but had the same
+     essential shortcomings.
+
+The results:
+  TODO SOME GRAPHICS/VIDEO
+     
+Both MobileNet and Yolo, even in their maxed-out configurations reacted very
+-very poorly to the yellow colored traffic light used in the parking lot
+ testing with Carla. Apparently the Coco dataset doesn't have yellow traffic
+  lights, therefore the recognizers trained on this dataset have no clue what
+   such a yellow object might be. This situation called for custom training...
+
+##### Custom-trained SSD-style classifier 
+The final approach we tried was to train an MobileNet SSD network on our
+specific yellow real-world traffic light, and our simulated, but traditional
+looking lights. And since we had to start from scratch, we decided to
+separately train for each color, and get traffic light states with a one-shot 
+process.  
+
+First we checked if we could take advantage of transfer learning, and could
+ re-train a full-blown MobileNet SSD model to our special requirements. This 
+approach remained elusive, as it would have needed several days of training
+ time on a high-end GPU. 
+
+We found this fantastic document, however https://github.com/pierluigiferrari/ssd_keras/blob/master/weight_sampling_tutorial.ipynb 
+It describes a miniature "SSD7" architecture, that is trainable within the
+ means of regular engineers. It takes a few hours to fully train from scratch
+  in the workspace on the K80 GPU, and 5-10 times that on a home PC, which is
+   reasonable.
+   
+The next challenge was to obtain an augmented dataset which includes color
+ information and bounding boxes for our two sets of traffic lights. We
+  managed to generate some of this data using semi-automated methods, but we
+   also had to do several  hours of hand-labeling. Altogether we accumulated
+  over 1000 labeled images, which was sufficient to get really robust results
+  . The performance never reached 100%, but by averaging 2 out of 3
+   detections the results were practically perfect.   
+ 
+Here are some examples of how the network behaves on different datasets:
+
+TODO include GIFs for parking lot and simulator 
+
+TODO:
+Something about image_raw conversion, and why it is unnecessary to do
+ undistortion (since the training sets are more heavily distorted during
+  training anyway)
+
+
+ 
+
+
 
 
 
