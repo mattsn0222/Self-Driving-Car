@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 import rospy
-from geometry_msgs.msg import PoseStamped
+from geometry_msgs.msg import PoseStamped, TwistStamped
 from styx_msgs.msg import Lane, Waypoint
 from std_msgs.msg import Int32
 import numpy as np
@@ -13,6 +13,9 @@ MAX_JERK = 0.5 # m/s2
 MAX_ACCEL = 0.5 # m/s2
 PUBLISH_RATE = 30 # the consumer (waypoint follower) is running at 30 Hz supposedly
 DEBUG_BRAKEACTION = True
+ABS_STOP_RANGE = 4.0
+CONST_LOWSPEED_RANGE = 10.0
+CONST_LOWSPEED = 2.0
 
 class WaypointUpdater(object):
     def __init__(self):
@@ -22,6 +25,7 @@ class WaypointUpdater(object):
         rospy.Subscriber('/current_pose', PoseStamped, self.pose_cb)
         rospy.Subscriber('/base_waypoints', Lane, self.waypoints_cb)
         rospy.Subscriber('/traffic_waypoint', Int32, self.traffic_cb)
+        rospy.Subscriber('/current_velocity', TwistStamped, self.velocity_cb)
         #rospy.Subscriber('/obstacle_waypoint', Int32, self.obstacle_cb)
 
         # Publishers
@@ -34,6 +38,7 @@ class WaypointUpdater(object):
         self.waypoint_tree = None
         self.stopline_wp_idx = -1
         self.prev_stopline_wp_idx = -1
+        self.current_vel = None
 
         # Publish Loop
         self.loop()
@@ -96,12 +101,12 @@ class WaypointUpdater(object):
 
         # Enumerate over the list of waypoints
         total_dist = 0.0
-        
+            
         for i, wp in enumerate(waypoints):
             # Add new Waypoint object
             o = Waypoint()
             o.pose = wp.pose
-            linear_vel = wp.twist.twist.linear.x
+            
             # Center of car
             stop_idx = max(self.stopline_wp_idx - closest_idx - 2, 0)
             # Calculate distance to start to decelerate
@@ -109,13 +114,20 @@ class WaypointUpdater(object):
             if total_dist == 0.0:
                 total_dist = dist
             
-            # Linear deceleration
-            if linear_vel >= 3.5:
+            # Combination of SQRT deceleration and Linear deceleration depend on current velocity and distance to the stop line
+            if dist < ABS_STOP_RANGE:
+                # Use sqrt within ABS_STOP_RANGE from stop line to stop before it certainly.
                 vel = math.sqrt(2*MAX_JERK*dist)
-            elif total_dist < 10.0:
-                vel = math.sqrt(2*MAX_JERK*dist)
+            elif dist < CONST_LOWSPEED_RANGE:
+                # Constant low speed range to slowly approach to stop line.
+                vel = self.current_vel * dist / total_dist
+                if vel < CONST_LOWSPEED:
+                    vel = CONST_LOWSPEED
             else:
-                vel = wp.twist.twist.linear.x * dist / total_dist
+                # Use linear deceleration to smooth slow down other than above condition
+                vel = self.current_vel * dist / total_dist
+                if vel < 2.0:
+                    vel = 2.0
             
             # If the car is barely moving stop the car
             if vel < 1.0:
@@ -126,10 +138,13 @@ class WaypointUpdater(object):
             brake.append(o)
             if (DEBUG_BRAKEACTION):
                 if (self.stopline_wp_idx != self.prev_stopline_wp_idx and not vel==0.0):
-                    rospy.logwarn("Brake: idx={}, stop_idx={}, vel={:.1f}, cur_vel={:.1f}, total_dist={:.1f}, dist={:.1f}".format(i, stop_idx, vel, wp.twist.twist.linear.x, total_dist, dist))
+                    rospy.logwarn("Brake: idx={}, stop_idx={}, vel={:.1f}, cur_vel={:.1f}, total_dist={:.1f}, dist={:.1f}".format(i, stop_idx, vel, self.current_vel, total_dist, dist))
         
         self.prev_stopline_wp_idx = self.stopline_wp_idx
         return brake
+
+    def velocity_cb(self, msg):
+        self.current_vel = msg.twist.linear.x
 
     def pose_cb(self, msg):
         # Pose Callback
