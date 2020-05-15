@@ -14,7 +14,7 @@ import yaml
 
 STATE_COUNT_THRESHOLD = 3
 LOGGING_RATE = 5  # Only log at this rate (1 / Hz)
-SIMULATED_LIGHTS=True
+SIMULATED_LIGHTS=False
 
 class TLDetector(object):
     def __init__(self):
