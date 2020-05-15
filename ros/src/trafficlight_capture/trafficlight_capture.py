@@ -84,6 +84,8 @@ def load_graph(graph_file):
 
 STATE_COUNT_THRESHOLD = 3
 
+hackhack=0
+
 class TLCapture(object):
     def __init__(self):
 
@@ -278,14 +280,16 @@ class TLCapture(object):
         return cv_image
 
     def perform_detect_ssd7(self, cv_image):
+        global hackhack
+        #cv2.imwrite(str(hackhack)+".png", cv_image)
         cv_image = cv2.resize(cv_image, (416, 416))
-        cv_image_rgb = cv2.cvtColor(cv_image, cv2.COLOR_BGR2RGB)
+        #cv_image_rgb = cv2.cvtColor(cv_image, cv2.COLOR_BGR2RGB)
 
-        cv_image_rgb = np.reshape(cv_image_rgb, (1, 416, 416, 3))
+        cv_image_rgb = np.reshape(cv_image, (1, 416, 416, 3))
         y_pred = self.tf_session.run(self.detection,
                             feed_dict={self.input_tensor: cv_image_rgb, self.keras_learning: 0})
         y_pred_decoded = decode_detections(y_pred,
-                                           confidence_thresh=0.2,
+                                           confidence_thresh=0.9,
                                            iou_threshold=0.45,
                                            top_k=200,
                                            normalize_coords=True,
@@ -293,16 +297,17 @@ class TLCapture(object):
                                            img_width=cv_image.shape[1])
 
         print "decoded ypred: ", y_pred_decoded
-        boxColors = [(0, 255, 255), (0, 0, 255), (0, 255, 0)]
+        boxColors = [(255, 255, 0), (255, 0, 0), (0, 255, 0)]
         if len(y_pred_decoded) > 0:
-            for sss in y_pred_decoded:
-                if len(sss) == 0:
-                    continue
-                cls, conf, xmin, ymin, xmax, ymax = sss[0]
+            y_pred_list = y_pred_decoded[0].tolist()
+            for sss in y_pred_list:
+                # print sss
+                cls, conf, xmin, ymin, xmax, ymax = sss
                 boxColor = boxColors[int(cls) - 1]
                 cv2.rectangle(cv_image, (int(xmin), int(ymin)),
                               (int(xmax), int(ymax)), boxColor, 2)
-
+        #cv2.imwrite("recog_" + str(hackhack)+".png", cv_image)
+        hackhack += 1
         return cv_image
 
     def perform_detect_ssd(self, cv_image):

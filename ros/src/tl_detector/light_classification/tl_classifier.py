@@ -19,6 +19,12 @@ inference_map_code=[TrafficLight.RED, TrafficLight.YELLOW, TrafficLight.GREEN, T
 inference_map_text_ssd7=["Yellow", "Red", "Green", "none"]
 inference_map_code_ssd7=[TrafficLight.YELLOW, TrafficLight.RED, TrafficLight.GREEN, TrafficLight.UNKNOWN]
 
+class RunMode():
+    NORMAL = 1
+    ROSBAG_PLAYBACK = 2
+    GENERATE_IMAGES = 4
+
+RUN_MODE = RunMode.NORMAL 
 
 def softmax(x):
     e_x = np.exp(x - np.max(x))
@@ -36,9 +42,12 @@ def load_graph(graph_file):
 
 class TLClassifier(object):
     def __init__(self, is_site):
-        self.using_ssd7 = True#is_site
-        # Different classifiers for site and simulator
-        # Site-specific classifier
+        self.using_ssd7 = True
+        self.img_count = 0
+        if RUN_MODE & RunMode.ROSBAG_PLAYBACK:
+            self.is_site = True
+        else:
+            self.is_site = is_site
         if (self.using_ssd7):
             detection_graph = load_graph(SSD7_GRAPH_FILE)
 
@@ -49,7 +58,7 @@ class TLClassifier(object):
             self.detection = detection_graph.get_tensor_by_name('predictions/concat:0')
 
             self.tf_session = tf.Session(graph=detection_graph)
-
+        #TODO : remove this inferior approach (who would even think this would work?!)
         else:
             detection_graph = load_graph(GRAPH_FILE)
 
@@ -64,7 +73,7 @@ class TLClassifier(object):
 
             self.tf_session = tf.Session(graph=detection_graph)
 
-    def get_classification(self, image):
+    def get_classification(self, cv_image):
         """Determines the color of the traffic light in the image
         Args:
             image (cv::Mat): image containing the traffic light
@@ -72,34 +81,67 @@ class TLClassifier(object):
             int: ID of traffic light color (specified in styx_msgs/TrafficLight)
         """
         if (self.using_ssd7):
-            cv_image = cv2.resize(image, (416, 416))
+            # for the site image the camera is positioned poorly and a large part of the image
+            # is the hood. Therefore we crop off the top left corner, which is the relevant part
+            # (as long as the car is going clockwise - otherwise we should crop both the
+            # top left and top right and run a recognition on both, adding the results)
+            orig_image=cv_image
+            if self.is_site:
+                cv_image = cv_image[0:416, 0:554].copy()
+
+            # save it at this point, as this is the most useful for later image generation
+            img_height=cv_image.shape[0]
+            img_width=cv_image.shape[1]
+
+            cv_image = cv2.resize(cv_image, (416, 416))
             cv_image_rgb = cv2.cvtColor(cv_image, cv2.COLOR_BGR2RGB)
 
-            cv_image_rgb = np.reshape(cv_image_rgb, (1, 416, 416, 3))
+            cv_images = np.reshape(cv_image_rgb, (1, 416, 416, 3))
             y_pred = self.tf_session.run(self.detection,
-                                         feed_dict={self.input_tensor: cv_image_rgb, self.keras_learning: 0})
+                                         feed_dict={self.input_tensor: cv_images, self.keras_learning: 0})
+
+
+
             y_pred_decoded = decode_detections(y_pred,
-                                               confidence_thresh=0.2,
+                                               confidence_thresh=0.7,
                                                iou_threshold=0.45,
                                                top_k=200,
                                                normalize_coords=True,
-                                               img_height=cv_image.shape[0],
-                                               img_width=cv_image.shape[1])
+                                               img_height=img_height,
+                                               img_width=img_width)
 
             votes=[0]*3
-            argm = 0
-            for sss in y_pred_decoded:
-                if len(sss) == 0:
-                    continue
-                cls, conf, xmin, ymin, xmax, ymax = sss[0]
-                votes[int(cls-1)] += 1
+            argm = 3 # default is none
+            if len(y_pred_decoded) > 0:
+                y_pred_list = y_pred_decoded[0].tolist()
+                for cls, conf, xmin, ymin, xmax, ymax in y_pred_list:
+                    votes[int(cls-1)] += 1
             if np.max(votes) != 0:
-                argm = np.argmax(votes)+1
+                argm = np.argmax(votes)
 
-            rospy.logwarn('Guessed ' + inference_map_text_ssd7[argm])
+            rospy.logwarn('Guessed ' + inference_map_text_ssd7[argm] + " votes(YRG) " + str(votes))
+
+            if RUN_MODE & RunMode.GENERATE_IMAGES:
+                boxColors = [(0, 255, 255), (0, 0, 255), (0, 255, 0)]
+                if len(y_pred_decoded) > 0:
+                   y_pred_list = y_pred_decoded[0].tolist()
+                   for sss in y_pred_list:
+                       # print sss
+                       cls, conf, xmin, ymin, xmax, ymax = sss
+                       boxColor = boxColors[int(cls) - 1]
+                       cv2.rectangle(orig_image, (int(xmin), int(ymin)),
+                                     (int(xmax), int(ymax)), boxColor, 2)
+                orig_image = cv2.putText(orig_image,
+                                           'Guessed ' + inference_map_text_ssd7[argm] + str(votes),
+                                           (50,50), cv2.FONT_HERSHEY_SIMPLEX,
+                                           fontScale=1, color=(255,255,255), thickness=2)
+                #outimg = cv2.cvtColor(orig_image, cv2.COLOR_RGB2BGR)
+                cv2.imwrite("recog_%04d.png" % self.img_count, orig_image)
+                self.img_count += 1
 
             return inference_map_code_ssd7[argm]
         else:
+            #TODO: remove obsolete approach
             cv_image = cv2.resize(image, (224, 224))
             preprocessed_input = self.mobilenet_preprocess(cv_image)
 
