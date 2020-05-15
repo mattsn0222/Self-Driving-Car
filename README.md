@@ -7,7 +7,7 @@ The goal of this project is to use Ros code to integrate with Carla, Udacity's S
 
 ### Team
 | Name | Email |
-| :-------------------------------: |:------------------------------------:|
+| :------------------------------- |:------------------------------------|
 | Krishan Patel (Team Leader)  | kspatel95@gmail.com |
 | Tamás Kerecsen                    | kerecsen@gmail.com |
 | Tomoya Matsumura               | tomoya.matsumura@gmail.com |
