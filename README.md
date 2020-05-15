@@ -24,7 +24,7 @@ The goal of this project is to use ROS code to integrate with Carla, Udacity's S
 ```
 ---
 
-## Ros System
+## ROS System
 
 The ROS system utilized in the Simulator is intended to be modeled very similarly to the Udacity Self Driving Car. 
 The architecture of the ROS nodes was defined in the project repository, but
