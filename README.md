@@ -44,10 +44,15 @@ the next points to tell the car where to go.
 At startup, the car is given base waypoints for the entire route. 
 Our code only looks at a portion of the waypoints that is immediately relevant to the car. 
 It starts by finding the closest waypoint ahead of the car and 
-a certain number of waypoints further ahead, then makes any adjustments 
+LOOKAHEAD_WPS number of waypoints further ahead, then makes any adjustments 
 needed based on traffic lights or obstacles.  
 If obstacles or traffic lights are detected, a path is planned that slows
 down ahead of the stop line or obstacle. 
+Deceleration concept is as following picture. Once the vehicle detected the next traffic light as red, the target velocities for each waypoint are defined as linear deceleration till the stopline waypoint except the below condition.
+- the calculated velocity is lower than CONST_LOWSPEED, set CONST_LOWSPEED as target speed
+- distance to stopline waypoint within CONST_LOWSPEED_RANGE, set CONST_LOWSPEED as target speed.
+- distance to stopline waypoint within ABS_STOP_RANGE, set SQRT deceleration to absolutely stop before the stopline.
+![alt text](writeup_illustrations/deceleration.png "Deceleration concept")
 
 #### Traffic Light Detection
 
