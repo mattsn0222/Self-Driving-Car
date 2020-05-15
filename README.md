@@ -14,11 +14,13 @@ The goal of this project is to use Ros code to integrate with Carla, Udacity's S
 | Gyorgy Blahut                        | fable3@gmail.com |
 
 ### To get Ros code started (Simulator)
-```1. cd Self-Driving-Car
+```
+1. cd Self-Driving-Car
 2. ./run.sh
 ```
 ### If setup is needed for downloading required packages
-``` ./setup.sh
+``` 
+./setup.sh
 ```
 ---
 
