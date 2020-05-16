@@ -103,14 +103,15 @@ class TLClassifier(object):
                     max_confidences[int(cls - 1)] = conf
                 sum_confidences[int(cls - 1)] += conf
         if np.max(max_confidences) != 0:
-            highest_confs = np.argwhere(max_confidences == np.amax(max_confidences))
-            argm = highest_confs[0]
-            if len(highest_confs) > 1:
-                max_sum = 0
-                for idx in highest_confs:
-                    if sum_confidences[idx] > max_sum:
-                        max_sum = sum_confidences[idx]
-                        argm = idx
+            argm = np.argmax(max_confidences)
+#             highest_confs = np.argwhere(max_confidences == np.amax(max_confidences))
+#             argm = highest_confs[0]
+#             if len(highest_confs) > 1:
+#                 max_sum = 0
+#                 for idx in highest_confs:
+#                     if sum_confidences[idx] > max_sum:
+#                         max_sum = sum_confidences[idx]
+#                         argm = idx
 
         rospy.logwarn('Prediction %s R:%0.2f Y:%0.2f G:%0.2f' % (
         inference_map_text_ssd7[argm], max_confidences[1], max_confidences[0], max_confidences[2]))
