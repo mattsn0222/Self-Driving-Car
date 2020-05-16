@@ -182,10 +182,7 @@ secondary classifier had problems. Green light was classified yellow or red, due
 
 There are 3 ROSbag files which we used for testing, using the first word of the filename they're called Just, Loop and Train.
 The first 2 was promising, but the 3rd one had problems even on the pretrained MobileNet part.
-There're annotated videos about this solution for all 3 samples. (fablenet_train.mp4, fablenet_loop.mp4, fablenet_just.mp4)
-
-The results:
-  TODO SOME GRAPHICS/VIDEO
+Here's an annotated video of the "just_traffic_light" ROSbag: [fablenet_just.mp4](writeup_illustrations/fablenet_just.mp4)
      
 Both MobileNet and Yolo, even in their maxed-out configurations reacted very-very
  poorly to the yellow colored traffic light used in the parking lot
@@ -235,16 +232,18 @@ When there's no box at all, the image is skipped automatically, which helps ente
 The detection algorithm on the LAB color model, which is good for identifing yellow. It's enhanched with CLAHE.
 Sobel finds vertical edges. After tresholding, HoughTransformP finds the lines.
 Lines are filtered so that they need to be mostly vertical, in pairs, and the resulting box width has to be 0.3 to 0.6 times the height.
-The result can be seen in annotated video form as traffic_lights_training_annot.mp4
+The result can be seen in annotated video form: [traffic_lights_training_annot.mp4](writeup_illustrations/traffic_lights_training_annot1.mp4)
 
 Here are some examples of how the network behaves on different datasets:
 
-TODO include GIFs for parking lot and simulator 
+<div>
+    <video width="99%" height="640" autoplay loop muted>
+        <source src="writeup_illustrations/ssd7_fablemagic.mp4" type="video/mp4">
+    </video>
+</div>
 
-TODO:
-Something about image_raw conversion, and why it is unnecessary to do
- undistortion (since the training sets are more heavily distorted during
-  training anyway)
+[Parking lot](writeup_illustrations/ssd7_fablemagic.mp4) and
+[Simulator](writeup_illustrations/ssd7_simulation.mp4)
 
 There are 2 separate topics for image: image_color and image_raw.
 The simulator only sends image_color, the Just and the Loop ROSbag files only had image_raw, the Train ROSbag had both.
@@ -256,6 +255,12 @@ To obtain the images from the ROSbag files, the messages are converted to text:
 rostopic echo /image_raw -b traffic_light_training.bag > training_image_raw
 ```
 The resulting text file is converted to RGB image list with the `trainer/raw2img.py` script.
+
+Training was based on the distorted camera images, so undistorting images before prediction would be detrimental.
+
+To confirm that traffic light detection works on real life images, we used the ROSbag playback while the simulator was running as well.
+The car was "parked" before a traffic light in the simulator by manually crashing it into a tree. This was necessary to trigger the detection.
+Camera feed was switched off in the simulator, the tl_detector node was working on the ROSbag images.
 
 #### Drive By Wire Node
 
