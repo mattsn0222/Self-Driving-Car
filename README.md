@@ -260,6 +260,9 @@ Camera feed was switched off in the simulator, the tl_detector node was working 
 
 The DBW Node uses the data coming from the waypoint updater to know when to apply different commands to throttle, braking, and steering. By default the car is going to throttle till it hits the speed limit or the vehicle limit, as the waypoints require some steering or braking the car relies on updates from the twist_controller.py. The Twist Controller  utilizes a combination of PID, a Low Pass Filter, and a Yaw Controller all to have a smoother and more effective response to control the car. The Twist Controller ensures that the car is able to make a full stop when needed, steer to stay within the lanes, and maintain speed when possible which feeds directly into the DBW Node when enabled.
 
+To test the `/vehicle/steering_cmd`, `/vehicle/brake_cmd` and `/vehicle/throttle_cmd` topic frequency, we collected data for about 10 seconds, and counted the number of messages, which should be around 500.
+This testing code is in test_50Hz.sh. The result was between 485 and 495 for each channel, the missing messages was due to the startup time for `rostopic`.
+
 ---
 
 ### Udacity Capstone Project README
