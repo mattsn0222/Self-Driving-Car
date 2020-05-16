@@ -175,8 +175,7 @@ Unfortunately Yolo natively runs under the darknet neural network development
  tool, not Tensorflow. There are Tensorflow ports of Yolo, but we didn't
   manage to get any of them working with the published weight files (we
    backported a couple to python 2.7 and tensorflow 1.3, but for some reason
-   the way they were loading the weights
-   - which involves a lot of bit shuffling and tensorflow surgery - failed in
+   the way they were loading the weights - which involves a lot of bit shuffling and tensorflow surgery - failed in
     our environment). It would have been possible to train such a model from
      scratch, but it would have required more training hours than what we had
       available in the workspace.
