@@ -11,6 +11,7 @@ The goal of this project is to use ROS code to integrate with Carla, Udacity's S
 [image6]: writeup_illustrations/real_light.jpg "Real light 1"
 [image7]: writeup_illustrations/real_light_bad.jpg "Real light bad"
 [image8]: writeup_illustrations/trafficlight_capture.jpg "Auto-generated training data for MobileNet"
+[image9]: writeup_illustrations/annotating.png "Labeling is back-breaking labor"
 
 ### Team
 | Name | Email |
@@ -203,6 +204,7 @@ The first 2 was promising, but the 3rd one had problems even on the pretrained M
 Here's an annotated video of the "just_traffic_light" ROSbag: [fablenet_just.mp4](writeup_illustrations/fablenet_just.mp4)
 
 A frame from the Train ROSbag where it works:
+
 ![fablenet_train_1648.png](writeup_illustrations/fablenet_train_1648.png)
      
 Both MobileNet and Yolo, even in their maxed-out configurations reacted very-very
@@ -244,6 +246,8 @@ The next challenge was to obtain an augmented dataset which includes color
    results. The performance of the model never reached 100%, but when
     averaging 2 out of 3 detections the results were practically perfect.   
  
+![][image9]
+
 The semi-automated annotation tool is in trainer/AutoAnnot.ipynb.
 It uses the manually edited annot_hint.txt file, and the images from the training ROSbag file.
 The numbers in the text file are the frame numbers, r/g/y is the color, which is the same for subsequent images, so only captured at changes.
@@ -254,9 +258,9 @@ The detection algorithm on the LAB color model, which is good for identifing yel
 Sobel finds vertical edges. After tresholding, HoughTransformP finds the lines.
 Lines are filtered so that they need to be mostly vertical, in pairs, and the resulting box width has to be 0.3 to 0.6 times the height.
 
-The result can be seen in annotated video form: [traffic_lights_training_annot.mp4](writeup_illustrations/traffic_lights_training_annot1.mp4)
+The result can be seen in annotated video form: 
 
-![sample annotated_image](writeup_illustrations/annot_r_train_0017.png)
+[![sample annotated_image](writeup_illustrations/annot_r_train_0017.png)](https://drive.google.com/open?id=1afkYOZbZMM9NxO1_l_QJSFi4uJJJLzxe)
 
 Here are some examples of how the network behaves in the simulator and on the parking lot images from the ROSbag:
 
