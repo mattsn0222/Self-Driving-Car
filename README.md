@@ -236,12 +236,6 @@ The result can be seen in annotated video form: [traffic_lights_training_annot.m
 
 Here are some examples of how the network behaves on different datasets:
 
-<div>
-    <video width="99%" height="640" autoplay loop muted>
-        <source src="writeup_illustrations/ssd7_fablemagic.mp4" type="video/mp4">
-    </video>
-</div>
-
 [Parking lot](writeup_illustrations/ssd7_fablemagic.mp4) and
 [Simulator](writeup_illustrations/ssd7_simulation.mp4)
 
