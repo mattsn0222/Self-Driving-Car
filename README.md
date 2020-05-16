@@ -233,6 +233,7 @@ The detection algorithm on the LAB color model, which is good for identifing yel
 Sobel finds vertical edges. After tresholding, HoughTransformP finds the lines.
 Lines are filtered so that they need to be mostly vertical, in pairs, and the resulting box width has to be 0.3 to 0.6 times the height.
 The result can be seen in annotated video form: [traffic_lights_training_annot.mp4](writeup_illustrations/traffic_lights_training_annot1.mp4)
+![sample annotated_image](writeup_illustrations/annot_r_train_0017.png)
 
 Here are some examples of how the network behaves on different datasets:
 
