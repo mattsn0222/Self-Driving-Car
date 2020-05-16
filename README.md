@@ -185,7 +185,7 @@ The first 2 was promising, but the 3rd one had problems even on the pretrained M
 Here's an annotated video of the "just_traffic_light" ROSbag: [fablenet_just.mp4](writeup_illustrations/fablenet_just.mp4)
 
 A frame from the Train ROSbag where it works:
-![fablenet_train_1648.png](writeup_illustrations\fablenet_train_1648.png)
+![fablenet_train_1648.png](writeup_illustrations/fablenet_train_1648.png)
      
 Both MobileNet and Yolo, even in their maxed-out configurations reacted very-very
  poorly to the yellow colored traffic light used in the parking lot
