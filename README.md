@@ -243,8 +243,8 @@ The next challenge was to obtain an augmented dataset which includes color
    details below), but we
    also had to do several hours of hand-labeling. Altogether we accumulated
   over 1600 labeled images, which was sufficient to get fairly robust training
-   results. The performance of the model never reached 100%, but when
-    averaging 2 out of 3 detections the results were practically perfect.   
+   results. The performance of the model never reached 100%, but we got to the point where
+   the network was making a mistake on only 2 or 3 images out of the roughly 2000 images in the ROSbag.   
  
 ![][image9]
 
