@@ -3,7 +3,14 @@ The goal of this project is to use ROS code to integrate with Carla, Udacity's S
 
 [//]: # (Image References)
 
-[image1]: /img/final-project-ros-graph-v2.png "ROS System"
+[image1]: img/final-project-ros-graph-v2.png "ROS System"
+[image2]: writeup_illustrations/model_1.png "SSD7 architecture"
+[image3]: writeup_illustrations/ssd7sim_thumbnail.png "Simulation results with SSD7"
+[image4]: writeup_illustrations/fablemagic_thumbnail.png "ROSbag playback results with SSD7"
+[image5]: writeup_illustrations/simulated_lights.jpg "Simulated lights"
+[image6]: writeup_illustrations/real_light.jpg "Real light 1"
+[image7]: writeup_illustrations/real_light_bad.jpg "Real light bad"
+[image8]: writeup_illustrations/trafficlight_capture.jpg "Auto-generated training data for MobileNet"
 
 ### Team
 | Name | Email |
@@ -75,6 +82,13 @@ test track, where Carla runs. The appearance of the background and the
   classifiers have to be developed for the two scenarios, or the one has to
    be very flexible with regards to the appearance of the lights and the
     background.  
+
+Note the significant difference between the appearance of the real and simulated traffic lights lights, especially under poor exposure conditions (that last image is a "green"):
+
+![image5] 
+![image6] 
+![image7]
+
     
 In addition to this challenge, Carla runs a very old Tensorflow 1.3 and
  Python 2.7 environment, that rules out many off-the-shelf solutions
@@ -101,15 +115,19 @@ ROS topic with the images coming from the simulator in the `/image_color`
 topic and built a database of annotated images: images combined the traffic
 light state. 
 
+
 When traffic lights are calculated to be visible (and close enough) based on the
  pose of the car and that of the traffic light, the tool saves each incoming
   image to a folder structure that is compatible with the Keras
    ImageDataGenerator (using the traffic light state helpfully provided by the simulator).
 
+Here is what the directory structure that the tool generates for ImageDataGenerator:
+![alt text][image8]
+
 A trainer python tool (`trainer/trainer.py`) takes these images and
  retrains the MobileNet V1 sample in Keras with the images as input.
 
-The resulting classifier worked acceptably well, once it was close enough, it
+The resulting classifier worked acceptably well, once the car was close enough to the lights it
  recognized the traffic light colors, but it was noisy and unpredictable when
   farther away from the lights. It obviously didn't work for the real-world
    scenario at all without further training. 
@@ -212,7 +230,7 @@ Among other things, he describes a miniature "SSD7" architecture, that is
    a home PC, which is still reasonable.
    
 Here is the architecture of the SSD7 network:
-![alt text](writeup_illustrations/model_1.png "SSD7 architecture")
+![SSD7 architecture][image2]
    
 The next challenge was to obtain an augmented dataset which includes color
  information and bounding boxes for our two sets of traffic lights. We
@@ -232,13 +250,14 @@ When there's no box at all, the image is skipped automatically, which helps ente
 The detection algorithm on the LAB color model, which is good for identifing yellow. It's enhanched with CLAHE.
 Sobel finds vertical edges. After tresholding, HoughTransformP finds the lines.
 Lines are filtered so that they need to be mostly vertical, in pairs, and the resulting box width has to be 0.3 to 0.6 times the height.
-The result can be seen in annotated video form: [traffic_lights_training_annot.mp4](writeup_illustrations/traffic_lights_training_annot1.mp4)
+The result can be seen in annotated video form:
+[traffic_lights_training_annot.mp4](writeup_illustrations/traffic_lights_training_annot1.mp4)
 ![sample annotated_image](writeup_illustrations/annot_r_train_0017.png)
 
-Here are some examples of how the network behaves on different datasets:
+Here are some examples of how the network behaves in the simulator and on the parking lot images from the ROSbag:
 
-[Parking lot](writeup_illustrations/ssd7_fablemagic.mp4) and
-[Simulator](writeup_illustrations/ssd7_simulation.mp4)
+[![ROSbag][image4])](https://drive.google.com/open?id=1rWTJ7Yh6Jdcscb8soLvVjky6InssjkzS)
+[![Simulation][image3])](https://drive.google.com/open?id=17fBt88zy1Yr9ifKuiiNJQACBlf09buy1)
 
 There are 2 separate topics for image: image_color and image_raw.
 The simulator only sends image_color, the Just and the Loop ROSbag files only had image_raw, the Train ROSbag had both.
@@ -249,9 +268,11 @@ To obtain the images from the ROSbag files, the messages are converted to text:
 ```
 rostopic echo /image_raw -b traffic_light_training.bag > training_image_raw
 ```
-The resulting text file is converted to RGB image list with the `trainer/raw2img.py` script.
+The resulting text file is converted to RGB image list with the `trainer/raw2img.py` script. This technique for conversion captures every single frame in the ROSbag, whereas trying to play back the 
+dataset and capture the /image_* topics in a ROS node loses a lot of frames due to congestion in our environment.
 
-Training was based on the distorted camera images, so undistorting images before prediction would be detrimental.
+The neural network training algorithm will heavily distort the images during the training process to prevent overtraining, therefore
+we judged that undistorting images before prediction would provide no substantial recognition quality improvement.
 
 To confirm that traffic light detection works on real life images, we used the ROSbag playback while the simulator was running as well.
 The car was "parked" before a traffic light in the simulator by manually crashing it into a tree. This was necessary to trigger the detection.
