@@ -201,6 +201,9 @@ secondary classifier had problems. Green light was classified yellow or red, due
 There are 3 ROSbag files which we used for testing, using the first word of the filename they're called Just, Loop and Train.
 The first 2 was promising, but the 3rd one had problems even on the pretrained MobileNet part.
 Here's an annotated video of the "just_traffic_light" ROSbag: [fablenet_just.mp4](writeup_illustrations/fablenet_just.mp4)
+
+A frame from the Train ROSbag where it works:
+![fablenet_train_1648.png](writeup_illustrations/fablenet_train_1648.png)
      
 Both MobileNet and Yolo, even in their maxed-out configurations reacted very-very
  poorly to the yellow colored traffic light used in the parking lot
@@ -250,8 +253,9 @@ When there's no box at all, the image is skipped automatically, which helps ente
 The detection algorithm on the LAB color model, which is good for identifing yellow. It's enhanched with CLAHE.
 Sobel finds vertical edges. After tresholding, HoughTransformP finds the lines.
 Lines are filtered so that they need to be mostly vertical, in pairs, and the resulting box width has to be 0.3 to 0.6 times the height.
-The result can be seen in annotated video form:
-[traffic_lights_training_annot.mp4](writeup_illustrations/traffic_lights_training_annot1.mp4)
+
+The result can be seen in annotated video form: [traffic_lights_training_annot.mp4](writeup_illustrations/traffic_lights_training_annot1.mp4)
+
 ![sample annotated_image](writeup_illustrations/annot_r_train_0017.png)
 
 Here are some examples of how the network behaves in the simulator and on the parking lot images from the ROSbag:
